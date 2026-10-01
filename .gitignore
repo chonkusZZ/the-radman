@@ -1,0 +1,8 @@
+dist/
+data/
+*.log
+.env
+/*.sql
+master.key*
+backups/
+.DS_Store

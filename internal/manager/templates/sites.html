@@ -1,0 +1,7 @@
+{{define "content"}}<h1>Sites</h1><p class="sub">A site groups the access points and the node that authenticates for them.</p>
+<div class="card">{{if .Sites}}<table><tr><th>Site</th><th>Access points</th><th>Nodes</th><th>Online</th></tr>
+{{range .Sites}}<tr><td><a href="/sites/{{.ID}}"><b>{{.Name}}</b></a><div class="help">{{.Description}}</div></td><td>{{.APs}}</td><td>{{.Nodes}}</td><td><span class="badge {{if and .Nodes (eq .Online .Nodes)}}ok{{else if .Nodes}}warn{{end}}">{{.Online}} / {{.Nodes}}</span></td></tr>{{end}}</table>
+{{else}}<p class="empty">No sites yet.</p>{{end}}</div>
+{{if .CanWrite}}<div class="card"><h2>New site</h2><form method="post" action="/sites"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="row"><div><label>Name</label><input type="text" name="name" required></div><div><label>Description</label><input type="text" name="description"></div></div>
+<div class="actions"><button type="submit">Create site</button></div></form></div>{{end}}{{end}}

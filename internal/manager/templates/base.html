@@ -1,0 +1,55 @@
+{{define "base"}}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{if .Title}}{{.Title}} · {{end}}arc's The RadMAN</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
+<body>{{if .User}}
+<div class="shell"><aside class="side"><div class="brand">{{template "brand" .}}</div>
+<nav>
+{{if .Standalone}}<a href="/" class="{{if eq .Path "/"}}on{{end}}">Dashboard</a>
+<a href="/sites" class="{{if hasPrefix .Path "/sites"}}on{{end}}">Sites</a>
+<a href="/nodes" class="{{if hasPrefix .Path "/nodes"}}on{{end}}">Nodes</a>
+<a href="/pki" class="{{if hasPrefix .Path "/pki"}}on{{end}}">PKI profiles</a>
+<a href="/eapcerts" class="{{if hasPrefix .Path "/eapcerts"}}on{{end}}">Server certificates</a>
+<a href="/stats" class="{{if hasPrefix .Path "/stats"}}on{{end}}">Stats</a>
+<a href="/logs" class="{{if hasPrefix .Path "/logs"}}on{{end}}">Logs</a>
+{{if .IsGlobalAdmin}}<a href="/users" class="{{if hasPrefix .Path "/users"}}on{{end}}">Users</a>
+<a href="/settings" class="{{if hasPrefix .Path "/settings"}}on{{end}}">Settings</a>{{end}}
+{{else}}
+{{if .IsGlobal}}<div class="navsec">Platform</div>
+<a href="/platform" class="{{if eq .Path "/platform"}}on{{end}}">Tenants</a>
+<a href="/platform/users" class="{{if hasPrefix .Path "/platform/users"}}on{{end}}">Users</a>
+<a href="/platform/audit" class="{{if hasPrefix .Path "/platform/audit"}}on{{end}}">Audit</a>
+<a href="/settings" class="{{if hasPrefix .Path "/settings"}}on{{end}}">Platform settings</a>{{end}}
+{{if .Tenant}}<div class="navsec">Tenant</div>
+<div class="tenantbox"><b>{{.Tenant.Name}}</b>{{if .Suspended}} <span class="badge warn">suspended</span>{{else if not .CanWrite}} <span class="badge">read-only</span>{{end}}
+<form method="post" action="/tenant/switch"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="tenant" value="">{{if .IsGlobal}}<button class="sec sm" type="submit">← Platform</button>{{else}}<a class="btn sec sm" href="/tenants">Switch tenant</a>{{end}}</form></div>
+<a href="/" class="{{if eq .Path "/"}}on{{end}}">Dashboard</a>
+<a href="/sites" class="{{if hasPrefix .Path "/sites"}}on{{end}}">Sites</a>
+<a href="/nodes" class="{{if hasPrefix .Path "/nodes"}}on{{end}}">Nodes</a>
+<a href="/pki" class="{{if hasPrefix .Path "/pki"}}on{{end}}">PKI profiles</a>
+<a href="/eapcerts" class="{{if hasPrefix .Path "/eapcerts"}}on{{end}}">Server certificates</a>
+<a href="/stats" class="{{if hasPrefix .Path "/stats"}}on{{end}}">Stats</a>
+<a href="/logs" class="{{if hasPrefix .Path "/logs"}}on{{end}}">Logs</a>
+{{if .CanWrite}}<a href="/users" class="{{if eq .Path "/users"}}on{{end}}">Users</a><a href="/sso" class="{{if eq .Path "/sso"}}on{{end}}">Single sign-on</a>{{end}}
+{{else if not .IsGlobal}}<a href="/tenants" class="on">Choose a tenant</a>{{end}}
+{{end}}
+<div class="navsec"></div>
+<a href="/account" class="{{if hasPrefix .Path "/account"}}on{{end}}">My account</a>
+</nav>
+<div class="who">{{.User.Email}}<br>{{.RoleLabel}} · v{{.Version}}
+<form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="sec sm" type="submit">Sign out</button></form></div></aside>
+<main>{{if .Suspended}}<div class="flash err">This tenant is suspended: changes are disabled for tenant users.</div>{{end}}{{if .Flash}}<div class="flash {{.FlashKind}}">{{.Flash}}</div>{{end}}{{template "content" .}}</main></div>
+{{else}}<main>{{if .Flash}}<div class="flash {{.FlashKind}}">{{.Flash}}</div>{{end}}{{template "content" .}}</main>{{end}}
+</body></html>{{end}}
+{{define "nodebadge"}}{{if eq .Status "pending"}}<span class="badge warn">awaiting enrollment</span>{{else if eq .Status "revoked"}}<span class="badge bad">revoked</span>{{else if .Online}}<span class="badge ok">online</span>{{else}}<span class="badge bad">offline</span>{{end}}{{end}}
+{{define "pkiform"}}<form method="post" action="{{if .P.ID}}/pki/{{.P.ID}}/update{{else}}/pki{{end}}"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="row"><div><label>Name</label><input type="text" name="name" value="{{.P.Name}}" required></div>
+<div><label>Type</label><select name="kind"><option value="azure" {{if eq .P.Kind "azure"}}selected{{end}}>Microsoft Azure Cloud PKI</option><option value="generic" {{if ne .P.Kind "azure"}}selected{{end}}>Any CA with CRL (ADCS, EJBCA, ...)</option></select></div></div>
+<label>CA certificates (PEM, root and any issuing CAs)</label><textarea name="ca_pem" required placeholder="-----BEGIN CERTIFICATE-----">{{.PEM}}</textarea>
+<div class="help"><b>Azure Cloud PKI:</b> in Intune → Tenant administration → Cloud PKI, open your issuing CA and download the CA certificate (and the root's). Paste both here. Device certificates issued by Cloud PKI are then validated on the nodes.</div>
+<label>CRL URLs (one per line)</label><textarea name="crl_urls" placeholder="http://.../ca.crl">{{.URLText}}</textarea>
+<div class="help">The manager downloads these and ships them to the nodes; nodes also refresh them directly if they can. Azure Cloud PKI shows the CRL distribution point on the issuing CA page.</div>
+<label>…or paste a sample device certificate to discover its CRL URL</label><textarea name="sample_cert" placeholder="optional: -----BEGIN CERTIFICATE-----"></textarea>
+<div class="row"><div><label>If the CRL is missing or out of date</label><select name="stale_policy"><option value="fail_closed" {{if ne .P.StalePolicy "fail_open"}}selected{{end}}>Reject authentications (fail closed, recommended)</option><option value="fail_open" {{if eq .P.StalePolicy "fail_open"}}selected{{end}}>Keep accepting (fail open)</option></select></div>
+<div><label>Grace period after CRL expiry (hours)</label><input type="number" name="stale_grace_hours" value="{{if .Grace}}{{.Grace}}{{else}}24{{end}}"></div></div>
+<div class="actions"><button type="submit">Save profile</button></div></form>{{end}}
+{{define "brand"}}{{if .Logo}}<img class="logo" src="/branding/logo.svg?v={{.LogoVer}}" alt="">{{end}}<span class="brandname">arc's The Rad<em>MAN</em></span>{{end}}

@@ -1,0 +1,5 @@
+{{define "content"}}<h1>Choose a tenant</h1><p class="sub">Pick the organisation you want to work in.</p>
+<div class="card">{{if .Choices}}<table><tr><th>Tenant</th><th>Your access</th><th></th></tr>
+{{range .Choices}}<tr><td><b>{{.Name}}</b> {{if eq .Status "suspended"}}<span class="badge warn">suspended</span>{{end}}</td><td>{{index $.User.Member .ID}}</td>
+<td><form method="post" action="/tenant/switch"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="tenant" value="{{.ID}}"><button class="sm" type="submit">Open</button></form></td></tr>{{end}}</table>
+{{else}}<p class="empty">You do not have access to any tenant yet. Ask your service provider to add you.</p>{{end}}</div>{{end}}

@@ -1,0 +1,4 @@
+{{define "content"}}<h1>Nodes</h1><p class="sub">Site nodes authenticate RADIUS requests locally and report to this manager.</p>
+<div class="card">{{if .Nodes}}<table><tr><th>Node</th><th>Site</th><th>Status</th><th>Last check-in</th><th>Client cert expires</th><th>Config</th><th>Queued events</th></tr>
+{{range .Nodes}}<tr><td><a href="/nodes/{{.ID}}">{{.Name}}</a><div class="help">{{.Host}} {{.Addr}}</div></td><td><a href="/sites/{{.SiteID}}">{{.SiteName}}</a></td><td>{{template "nodebadge" .}}</td><td>{{ago .LastSeen}}</td><td>{{if .CertNotAfter}}{{fmtTime .CertNotAfter}}{{end}}</td><td>{{if .InSync}}<span class="badge ok">in sync</span>{{else if eq .Status "active"}}<span class="badge warn">pending</span>{{end}}</td><td>{{.QueueDepth}}</td></tr>{{end}}</table>
+{{else}}<p class="empty">No nodes yet. Open a site to create one.</p>{{end}}</div>{{end}}

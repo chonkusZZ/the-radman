@@ -1,0 +1,4 @@
+{{define "content"}}<div class="login"><div class="card"><h1 class="brand center">{{template "brand" .}}</h1><h2>{{.T.Name}}</h2>
+{{if .SSOOn}}<p class="sub">Sign in with your organisation's account.</p><a class="btn" href="/t/{{.T.Slug}}/saml/login">Sign in with single sign-on</a>
+{{else}}<p class="sub">Single sign-on is not enabled for this organisation.</p>{{end}}
+<p class="help"><a href="/login">Sign in with a password instead</a></p></div></div>{{end}}

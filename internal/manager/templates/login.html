@@ -1,0 +1,11 @@
+{{define "content"}}<div class="login"><div class="card"><h1 class="brand center">{{template "brand" .}}</h1><p class="sub">Sign in to continue.</p>
+{{if .Err}}<div class="flash err">{{.Err}}</div>{{end}}
+{{if not .Standalone}}<form method="post" action="/sso/discover"><label>Work e-mail — sign in with your organisation's single sign-on</label><input type="email" name="email" placeholder="you@company.com" autocomplete="username"><div class="actions"><button type="submit" class="sec">Continue with SSO</button></div></form>
+{{if .SSO}}<p class="help">Platform staff: <a href="/saml/login">sign in with single sign-on</a></p>{{end}}
+<p class="help">or sign in with a password:</p>{{else}}{{if .SSO}}<a class="btn" href="/saml/login">Sign in with single sign-on</a><p class="help">or use a local account:</p>{{end}}{{end}}
+{{if .Local}}<form method="post" action="/login">
+<label>E-mail</label><input type="email" name="email" value="{{.Email}}" required autofocus>
+<label>Password</label><input type="password" name="password" required autocomplete="current-password">
+{{if .NeedTOTP}}<label>Authentication code</label><input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" autofocus>{{end}}
+<div class="actions"><button type="submit">Sign in</button></div></form>{{end}}
+</div></div>{{end}}

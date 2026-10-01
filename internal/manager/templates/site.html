@@ -1,0 +1,55 @@
+{{define "content"}}<h1>{{.Name}}</h1><p class="sub">{{.Description}}</p>
+<div class="card"><h2>Nodes</h2>
+{{if .Nodes}}<table><tr><th>Name</th><th>Status</th><th>Last check-in</th><th>Config</th><th>Version</th></tr>
+{{range .Nodes}}<tr><td><a href="/nodes/{{.ID}}">{{.Name}}</a></td><td>{{template "nodebadge" .}}</td><td>{{ago .LastSeen}}</td><td>{{if .InSync}}<span class="badge ok">in sync</span>{{else if eq .Status "active"}}<span class="badge warn">pending sync</span>{{end}}</td><td>{{.Version}} {{.OS}}</td></tr>{{end}}</table>
+{{else}}<p class="empty">No node yet. Create one, then download and run the package on a server at the site.</p>{{end}}
+{{if .CanWrite}}<form method="post" action="/sites/{{.ID}}/nodes" class="nodeform"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="row"><div><label>Node name</label><input type="text" name="name" placeholder="e.g. {{.Name}}-node1" required></div>
+<div><label>RADIUS server certificate names (optional)</label><input type="text" name="server_names" placeholder="radius.example.com, 10.1.0.5"></div></div>
+<div class="help">Comma-separated host names and/or IP addresses. The <b>first</b> becomes the certificate's CN; <b>all</b> become subject alternative names, so devices that check the server name (CN/SAN) accept it. Use the name or IP your access points and devices use to reach this node. Leave empty to use the site's certificate.</div>
+<div class="actions"><button type="submit">Create site node</button></div></form>{{end}}</div>
+
+<div class="card"><h2>Access points</h2>
+{{if .APs}}<table><tr><th>Name</th><th>Source address</th><th>Vendor</th><th>Shared secret</th><th></th></tr>
+{{range .APs}}<tr><td>{{.Name}}<div class="help">{{.Notes}}</div></td><td><code>{{.Addr}}</code></td><td>{{.Vendor}}</td><td>{{if $.CanWrite}}<details><summary>show</summary><code>{{.Secret}}</code></details>{{else}}••••{{end}}</td>
+<td>{{if $.RadSecOn}}<a href="/aps/{{.ID}}/radsec">RadSEC certificates</a><br>{{end}}{{if $.CanWrite}}<details><summary>edit</summary><form method="post" action="/aps/{{.ID}}/update"><input type="hidden" name="csrf" value="{{$.CSRF}}">
+<label>Name</label><input type="text" name="name" value="{{.Name}}"><label>Address</label><input type="text" name="addr" value="{{.Addr}}"><label>Vendor</label><input type="text" name="vendor" value="{{.Vendor}}"><label>Notes</label><input type="text" name="notes" value="{{.Notes}}">
+<label>New shared secret</label><input type="text" name="secret" placeholder="leave blank to keep"><div class="actions"><button class="sm" type="submit">Save</button></div></form>
+<form method="post" action="/aps/{{.ID}}/delete" data-confirm="Remove this access point?"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="danger sm" type="submit">Remove</button></form></details>{{end}}</td></tr>{{end}}</table>
+{{else}}<p class="empty">No access points yet.</p>{{end}}
+{{if .CanWrite}}<h3>Add access point</h3><form method="post" action="/sites/{{.ID}}/aps"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="row"><div><label>Name</label><input type="text" name="name" required></div><div><label>IP address or CIDR</label><input type="text" name="addr" placeholder="10.1.0.21 or 10.1.0.0/24" required></div><div><label>Vendor (optional)</label><input type="text" name="vendor"></div></div>
+<label>Shared secret</label><input type="text" name="secret" placeholder="leave blank to generate a strong one"><div class="help">Configure the same secret on the AP as RADIUS shared secret. The AP's source address must match what the node sees (watch for NAT).</div>
+<div class="actions"><button type="submit">Add access point</button></div></form>{{end}}</div>
+
+<form method="post" action="/sites/{{.ID}}/update"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="card"><h2>Settings</h2><div class="row"><div><label>Name</label><input type="text" name="name" value="{{.Name}}"></div><div><label>Description</label><input type="text" name="description" value="{{.Description}}"></div></div>
+<div class="row"><div><label>RADIUS auth port</label><input type="number" name="auth_port" value="{{.AuthPort}}"></div><div><label>RADIUS accounting port</label><input type="number" name="acct_port" value="{{.AcctPort}}"></div></div>
+<label><input type="checkbox" name="radsec_enabled" value="1" {{if .RadSecOn}}checked{{end}}> Enable RadSEC (RADIUS over TLS) for access points</label>
+<div class="row"><div><label>RadSEC TCP port</label><input type="number" name="radsec_port" value="{{.RadSecPort}}"></div><div></div></div>
+<div class="help">APs connect to the node over TLS with a client certificate issued from the AP's <i>RadSEC certificates</i> page (the key is generated in your browser). Classic UDP RADIUS keeps working alongside.</div>
+<label>Server certificate presented to devices</label><select name="eap_cert_id">{{range .EAPCerts}}<option value="{{.ID}}" {{if .Selected}}selected{{end}}>{{.Name}} ({{.Extra}})</option>{{end}}</select>
+<div class="help">Devices must trust the issuer of this certificate. See <a href="/eapcerts">Server certificates</a>.</div></div>
+<div class="card"><h2>Accepted certificate authorities</h2>
+{{if .PKIs}}{{range .PKIs}}<label><input type="checkbox" name="pki" value="{{.ID}}" {{if .Selected}}checked{{end}}> {{.Name}} <span class="badge">{{.Extra}}</span></label>{{end}}
+{{else}}<p class="empty">No PKI profiles yet — <a href="/pki">create one</a>.</p>{{end}}
+<div class="help">Client certificates must chain to one of the selected profiles and not be revoked.</div></div>
+<div class="card" id="policy"><h2>Authorization policy</h2>
+<div class="row"><div><label>If no rule matches</label><select name="default_action"><option value="allow" {{if eq .Policy.DefaultAction "allow"}}selected{{end}}>Allow (any valid certificate)</option><option value="deny" {{if eq .Policy.DefaultAction "deny"}}selected{{end}}>Deny</option></select></div>
+<div><label>Default VLAN (optional)</label><input type="text" name="default_vlan" value="{{.Policy.DefaultVLAN}}"></div></div>
+{{if .CanWrite}}<div class="actions"><button type="submit">Save site settings</button></div>{{end}}</div></form>
+
+<div class="card"><h2>Policy rules</h2><p class="help">Evaluated top to bottom; the first match wins.</p>
+{{if .Policy.Rules}}<table><tr><th>#</th><th>Name</th><th>Match</th><th>Action</th><th>VLAN</th><th></th></tr>
+{{range $i, $r := .Policy.Rules}}<tr><td>{{add $i 1}}</td><td>{{$r.Name}}</td><td><code>{{$r.Field}} {{$r.Op}} {{$r.Value}}</code></td><td><span class="badge {{if eq $r.Action "allow"}}ok{{else}}bad{{end}}">{{$r.Action}}</span></td><td>{{$r.VLAN}}</td>
+<td>{{if $.CanWrite}}<form class="inline" method="post" action="/sites/{{$.ID}}/rules/{{$i}}/move"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="sec sm" name="dir" value="up">↑</button><button class="sec sm" name="dir" value="down">↓</button></form>
+<form class="inline" method="post" action="/sites/{{$.ID}}/rules/{{$i}}/delete"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="danger sm">Delete</button></form>{{end}}</td></tr>{{end}}</table>
+{{else}}<p class="empty">No rules: the default above applies to every valid certificate.</p>{{end}}
+{{if .CanWrite}}<h3>Add rule</h3><form method="post" action="/sites/{{.ID}}/rules"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="row"><div><label>Name</label><input type="text" name="name" required></div>
+<div><label>Attribute</label><select name="field"><option value="subject_cn">Subject common name</option><option value="san">Subject alt name (DNS / UPN / e-mail)</option><option value="issuer_cn">Issuer common name</option><option value="pki">PKI profile name</option></select></div>
+<div><label>Operator</label><select name="op"><option value="equals">equals</option><option value="contains">contains</option><option value="regex">matches regex</option></select></div>
+<div><label>Value</label><input type="text" name="value" required></div></div>
+<div class="row"><div><label>Action</label><select name="action"><option value="allow">Allow</option><option value="deny">Deny</option></select></div><div><label>VLAN to assign (optional)</label><input type="text" name="vlan"></div></div>
+<div class="actions"><button type="submit">Add rule</button></div></form>{{end}}</div>
+{{if .CanWrite}}<div class="card"><h2>Danger zone</h2><form method="post" action="/sites/{{.ID}}/delete" data-confirm="Delete this site, its access points and nodes?"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="danger" type="submit">Delete site</button></form></div>{{end}}{{end}}

@@ -1,0 +1,2 @@
+{{define "content"}}<h1>Platform audit</h1><p class="sub">Administrative actions across all tenants (latest 500).</p>
+<div class="card"><table><tr><th>Time</th><th>Tenant</th><th>Actor</th><th>Action</th><th>Detail</th></tr>{{range .Rows}}<tr><td>{{fmtTime .Time}}</td><td>{{.Tenant}}</td><td>{{.Actor}}</td><td><code>{{.Action}}</code></td><td>{{.Detail}}</td></tr>{{end}}</table></div>{{end}}

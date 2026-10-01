@@ -1,0 +1,17 @@
+{{define "content"}}<h1>Dashboard</h1><p class="sub">Overview of your RADIUS estate.</p>
+<div class="grid">
+<div class="stat"><span>Sites</span><b>{{.Sites}}</b></div>
+<div class="stat"><span>Nodes online</span><b>{{.NodesOnline}} / {{.NodesTotal}}</b></div>
+<div class="stat"><span>Accepted (24h)</span><b>{{.Accepts}}</b></div>
+<div class="stat"><span>Rejected (24h)</span><b>{{.Rejects}}</b></div>
+</div>
+{{if or .Pending .EAPExpiring .CRLFail}}<div class="card"><h2>Needs attention</h2><ul>
+{{if .Pending}}<li>{{.Pending}} node(s) waiting for enrollment — <a href="/nodes">view nodes</a></li>{{end}}
+{{if .EAPExpiring}}<li>{{.EAPExpiring}} server certificate(s) expire within 30 days — <a href="/eapcerts">view</a></li>{{end}}
+{{if .CRLFail}}<li>{{.CRLFail}} CRL(s) failing or stale — <a href="/pki">check PKI profiles</a></li>{{end}}
+</ul></div>{{end}}
+<div class="card"><h2>Recent authentications</h2>
+{{if .Recent}}<table><tr><th>Time</th><th>Site</th><th>Result</th><th>Device (cert subject)</th><th>AP</th><th>Detail</th></tr>
+{{range .Recent}}<tr><td>{{fmtTime .Time}}</td><td>{{.Site}}</td><td><span class="badge {{if eq (index .D "result") "accept"}}ok{{else}}bad{{end}}">{{index .D "result"}}</span></td><td>{{index .D "subject"}}</td><td>{{index .D "ap"}}</td><td>{{index .D "reason"}}</td></tr>{{end}}</table>
+<div class="actions"><a class="btn sec sm" href="/logs">Open full log</a></div>
+{{else}}<p class="empty">No authentication events yet. Create a site, add an access point and deploy a node.</p>{{end}}</div>{{end}}

@@ -1,0 +1,26 @@
+{{define "content"}}<h1>{{.N.Name}}</h1><p class="sub">Site <a href="/sites/{{.N.SiteID}}">{{.N.SiteName}}</a> · {{template "nodebadge" .N}}</p>
+{{if .Token}}<div class="card"><h2>Deploy this node</h2>
+<p>Download the package for the server's platform, copy it to the site server, unzip and run it. The package contains the node program plus a single-use enrollment file (valid until {{fmtTime .TokenExpires}}).</p>
+{{if .Platforms}}<div class="actions">{{range .Platforms}}<a class="btn" href="/nodes/{{$.N.ID}}/download/{{.OS}}-{{.Arch}}">{{.Label}}</a>{{end}}</div>
+{{else}}<div class="flash err">No node binaries are installed on this manager (expected in the node binary directory). Run <code>make nodes</code>.</div>{{end}}
+<h3>Or enroll manually</h3><pre>radman-node enroll --manager {{.Public}}:{{.UDPPort}} --ca-sha256 {{.CAFP}} --token {{.Token}}
+radman-node install &amp;&amp; radman-node start</pre>
+<p class="help">Needs outbound UDP {{.UDPPort}} to this manager; access points reach the node on UDP {{"1812/1813"}}. The node authenticates devices even while the manager is unreachable.</p></div>
+{{else if eq .N.Status "pending"}}<div class="card"><p>The enrollment token has expired.</p>
+{{if .CanWrite}}<form method="post" action="/nodes/{{.N.ID}}/regen"><input type="hidden" name="csrf" value="{{.CSRF}}"><button type="submit">Generate new token</button></form>{{end}}</div>{{end}}
+{{if ne .N.Status "pending"}}<div class="card"><h2>Status</h2><table>
+<tr><th>Last check-in</th><td>{{fmtTime .N.LastSeen}} ({{ago .N.LastSeen}}) from {{.N.Addr}}</td></tr>
+<tr><th>Host</th><td>{{.N.Host}} · {{.N.OS}} · v{{.N.Version}}</td></tr>
+<tr><th>Client certificate</th><td>expires {{fmtTime .N.CertNotAfter}} — renewed automatically 30 days before expiry</td></tr>
+<tr><th>Site config</th><td>{{if .N.InSync}}<span class="badge ok">node runs the current config</span>{{else}}<span class="badge warn">node has not applied the latest config yet</span>{{end}}</td></tr>
+<tr><th>Queued events</th><td>{{.N.QueueDepth}}</td></tr></table></div>
+{{if .CRLs}}<div class="card"><h2>CRLs on this node</h2><table><tr><th>URL</th><th>Next update</th><th>Source</th></tr>{{range .CRLs}}<tr><td class="mono">{{.URL}}</td><td>{{fmtTime .NextUpdate}}</td><td>{{.Source}}</td></tr>{{end}}</table></div>{{end}}{{end}}
+<div class="card"><h2>RADIUS server certificate</h2>
+{{if .Names}}<p>This node presents its own certificate for: {{range $i, $x := .Names}}{{if $i}}, {{end}}<code>{{$x}}</code>{{end}}<br><span class="help">CN = <code>{{index .Names 0}}</code>; all names are subject alternative names · expires {{fmtTime .NamesExpire}} (renewed automatically)</span></p>
+{{else}}<p>This node uses the <b>site's</b> server certificate.</p>{{end}}
+{{if .CanWrite}}<form method="post" action="/nodes/{{.N.ID}}/names"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>Names (comma-separated host names / IP addresses; first = CN)</label><input type="text" name="server_names" value="{{.NamesText}}" placeholder="radius.example.com, 10.1.0.5">
+<div class="help">Devices must trust the tenant's EAP CA (<a href="/eapcerts">Server certificates</a>) and, if they validate the server name, the name they connect to must be listed here. Leave empty to use the site's certificate.</div><div class="actions"><button type="submit" class="sec">Save names</button></div></form>{{end}}</div>
+{{if .CanWrite}}<div class="card"><h2>Manage</h2><div class="actions">
+{{if ne .N.Status "pending"}}<form method="post" action="/nodes/{{.N.ID}}/regen" data-confirm="Revoke the current certificate and issue a new enrollment token?"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="sec" type="submit">Re-enroll (new token)</button></form>{{end}}
+{{if eq .N.Status "active"}}<form method="post" action="/nodes/{{.N.ID}}/revoke" data-confirm="Revoke this node? It will no longer be able to check in."><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="danger" type="submit">Revoke</button></form>{{end}}
+<form method="post" action="/nodes/{{.N.ID}}/delete" data-confirm="Delete this node record?"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="danger" type="submit">Delete</button></form></div></div>{{end}}{{end}}

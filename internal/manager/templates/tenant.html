@@ -1,0 +1,24 @@
+{{define "content"}}<h1>{{.T.Name}}</h1><p class="sub"><a href="/platform">← Tenants</a> · <span class="mono">{{.T.Slug}}</span> · created {{fmtTime .T.Created}}</p>
+<div class="grid"><div class="stat"><span>Sites</span><b>{{.T.Sites}}{{if .T.MaxSites}} / {{.T.MaxSites}}{{end}}</b></div><div class="stat"><span>Access points</span><b>{{.T.APs}}{{if .T.MaxAPs}} / {{.T.MaxAPs}}{{end}}</b></div>
+<div class="stat"><span>Nodes online</span><b>{{.T.Online}} / {{.T.Nodes}}{{if .T.MaxNodes}} (max {{.T.MaxNodes}}){{end}}</b></div><div class="stat"><span>Auth 24h</span><b>{{.T.Accepts24h}} / {{.T.Rejects24h}}</b></div></div>
+<div class="card"><div class="actions"><form method="post" action="/tenant/switch" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="tenant" value="{{.T.ID}}"><button type="submit">Open this tenant</button></form>
+<form method="post" action="/tenant/switch" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="tenant" value="{{.T.ID}}"><input type="hidden" name="next" value="/sso"><button type="submit" class="sec">Single sign-on settings</button></form>
+<span class="help">SSO: {{if .SSOOn}}<span class="badge ok">enabled</span>{{if .SSORequired}} <span class="badge">local passwords disabled</span>{{end}}{{else}}<span class="badge">off</span>{{end}}{{if .SSODomains}} · domains: {{.SSODomains}}{{end}}</span></div></div>
+<div class="card"><h2>Settings</h2>{{if .IsGlobalAdmin}}<form method="post" action="/platform/tenants/{{.T.ID}}/update"><input type="hidden" name="csrf" value="{{.CSRF}}">{{end}}
+<div class="row"><div><label>Name</label><input type="text" name="name" value="{{.T.Name}}"></div>
+<div><label>Status</label><select name="status"><option value="active" {{if eq .T.Status "active"}}selected{{end}}>Active</option><option value="suspended" {{if eq .T.Status "suspended"}}selected{{end}}>Suspended (tenant users become read-only; nodes keep authenticating)</option></select></div></div>
+<div class="row"><div><label>Max sites (0 = unlimited)</label><input type="number" name="max_sites" min="0" value="{{.T.MaxSites}}"></div><div><label>Max access points</label><input type="number" name="max_aps" min="0" value="{{.T.MaxAPs}}"></div><div><label>Max nodes</label><input type="number" name="max_nodes" min="0" value="{{.T.MaxNodes}}"></div></div>
+<label>Internal notes</label><textarea name="notes">{{.Notes}}</textarea>
+{{if .IsGlobalAdmin}}<div class="actions"><button type="submit">Save</button></div></form>{{end}}</div>
+<div class="card"><h2>Users with access</h2>{{if .Members}}<table><tr><th>User</th><th>Role</th><th>Via</th><th>Last sign-in</th><th></th></tr>
+{{range .Members}}<tr><td>{{.Email}}<div class="help">{{.Name}}</div></td><td>{{if eq .Role "tenant_admin"}}Tenant administrator{{else}}Read-only{{end}}</td><td>{{.Source}}</td><td>{{fmtTime .LastLogin}}</td>
+<td>{{if $.IsGlobalAdmin}}<form method="post" action="/platform/tenants/{{$.T.ID}}/members/remove" data-confirm="Remove this user's access?"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="user" value="{{.UserID}}"><button class="danger sm">Remove</button></form>{{end}}</td></tr>{{end}}</table>
+{{else}}<p class="empty">Nobody has access yet.</p>{{end}}
+<p class="help">Global administrators and global read-only users can always see every tenant and are not listed here.</p>
+{{if .IsGlobalAdmin}}<h3>Add or invite a user</h3><form method="post" action="/platform/tenants/{{.T.ID}}/members"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="row"><div><label>E-mail</label><input type="email" name="email" required></div><div><label>Role</label><select name="role"><option value="tenant_admin">Tenant administrator</option><option value="read_only">Read-only</option></select></div></div>
+<div class="row"><div><label>Name (new users)</label><input type="text" name="name"></div><div><label>Initial password (new users, 12+ chars)</label><input type="password" name="password" autocomplete="new-password"></div></div>
+<div class="help">If the e-mail already has an account it is simply granted access; otherwise a local account is created.</div><div class="actions"><button type="submit">Grant access</button></div></form>{{end}}</div>
+{{if .IsGlobalAdmin}}<div class="card"><h2>Danger zone</h2><form method="post" action="/platform/tenants/{{.T.ID}}/delete" data-confirm="Permanently delete this tenant and everything in it?"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<label>Type <code>{{.T.Slug}}</code> to confirm</label><input type="text" name="confirm" autocomplete="off"><div class="help">Deletes all sites, nodes, certificates, logs and the tenant's CAs. Deployed nodes keep running from their cached config but can no longer check in.</div>
+<div class="actions"><button class="danger" type="submit">Delete tenant</button></div></form></div>{{end}}{{end}}

@@ -1,0 +1,10 @@
+{{define "content"}}<div class="login"><div class="card"><h1 class="brand center">{{template "brand" .}}</h1><h2>Welcome</h2><p class="sub">Create the first administrator.</p>
+{{if .Err}}<div class="flash err">{{.Err}}</div>{{end}}
+<form method="post" action="/setup">
+<label>Setup token</label><input type="text" name="token" required autocomplete="off"><div class="help">Printed in the manager's console / container log on first start.</div>
+<label>Public hostname of this manager</label><input type="text" name="host" value="{{.Host}}" required><div class="help">The DNS name (or IP) that site nodes and browsers use to reach this server. Embedded in node packages.</div>
+<label>Name</label><input type="text" name="name" value="{{.Name}}">
+<label>E-mail (sign-in name)</label><input type="email" name="email" value="{{.Email}}" required>
+<label>Password</label><input type="password" name="password" minlength="12" required autocomplete="new-password"><div class="help">At least 12 characters.</div>
+<label>Repeat password</label><input type="password" name="password2" minlength="12" required autocomplete="new-password">
+<div class="actions"><button type="submit">Create administrator</button></div></form></div></div>{{end}}

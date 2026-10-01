@@ -1,0 +1,80 @@
+# arc's The RadMAN (multi-tenant) - production-style stack.
+#
+#   cp .env.example .env   # set the passwords, then:
+#   docker compose up -d
+#   docker compose logs manager | grep "setup token"
+#
+# Optional hot standby / read replica:   docker compose --profile replica up -d
+services:
+  db:
+    build: ./deploy/postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: radman
+      POSTGRES_DB: radman
+      POSTGRES_PASSWORD: ${RADMAN_DB_PASSWORD:?set RADMAN_DB_PASSWORD in .env}
+      REPLICATION_PASSWORD: ${RADMAN_REPLICATION_PASSWORD:-}
+      # --- backups (pgBackRest). Encrypt the repository: losing the passphrase means losing the backups. ---
+      PGBACKREST_REPO1_CIPHER_TYPE: ${BACKUP_CIPHER_TYPE:-aes-256-cbc}
+      PGBACKREST_REPO1_CIPHER_PASS: ${BACKUP_PASSPHRASE:?set BACKUP_PASSPHRASE in .env}
+      PGBACKREST_REPO1_RETENTION_FULL: ${BACKUP_RETENTION_FULL:-2}
+      PGBACKREST_REPO1_RETENTION_DIFF: ${BACKUP_RETENTION_DIFF:-7}
+      BACKUP_HOUR: ${BACKUP_HOUR:-1}
+      # Off-site repository instead of the local /backups volume, e.g. S3 / MinIO / Azure Blob:
+      #   PGBACKREST_REPO1_TYPE: s3          PGBACKREST_REPO1_S3_BUCKET: my-bucket
+      #   PGBACKREST_REPO1_S3_ENDPOINT: s3.eu-west-2.amazonaws.com   PGBACKREST_REPO1_S3_REGION: eu-west-2
+      #   PGBACKREST_REPO1_S3_KEY: ...       PGBACKREST_REPO1_S3_KEY_SECRET: ...
+      #   PGBACKREST_REPO1_TYPE: azure       PGBACKREST_REPO1_AZURE_ACCOUNT / _KEY / _CONTAINER
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ${BACKUP_PATH:-backups}:/backups        # bind-mount a different disk / NFS share here in production
+    shm_size: 256mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U radman -d radman"]
+      interval: 5s
+      retries: 20
+
+  db-replica:
+    profiles: ["replica"]
+    build: ./deploy/postgres
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      POSTGRES_USER: radman
+      POSTGRES_DB: radman
+      POSTGRES_PASSWORD: ${RADMAN_DB_PASSWORD}
+      REPLICA_OF: db
+      REPLICATION_PASSWORD: ${RADMAN_REPLICATION_PASSWORD:-}   # required when this profile is used
+      BACKUP_ENABLED: "false"
+    volumes:
+      - replicadata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U radman -d radman"]
+      interval: 5s
+      retries: 30
+
+  manager:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      # Edition: "msp" (multi-tenant, default) or "standalone" (one organisation). See docker-compose.standalone.yml.
+      RADMAN_MODE: ${RADMAN_MODE:-msp}
+      RADMAN_DATABASE_URL: postgres://radman:${RADMAN_DB_PASSWORD}@db:5432/radman?pool_max_conns=${DB_POOL_MAX:-20}
+      # With the replica profile running, log and dashboard queries are served by the standby:
+      RADMAN_DATABASE_RO_URL: ${RADMAN_DATABASE_RO_URL:-}
+      # Optional: keep the master key in your secret manager instead of the data volume:
+      #   RADMAN_MASTER_KEY: <base64 32 bytes>
+    ports:
+      - "443:8443/tcp"   # web UI (also used for Let's Encrypt TLS-ALPN-01)
+      - "80:8080/tcp"    # redirect to HTTPS
+      - "7843:7843/udp"  # the single port site nodes use
+    volumes: [mgrdata:/data]
+
+volumes:
+  dbdata:
+  replicadata:
+  mgrdata:
+  backups:

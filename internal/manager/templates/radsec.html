@@ -1,0 +1,33 @@
+{{define "content"}}<h1>RadSEC · {{.AP}}</h1><p class="sub"><a href="/sites/{{.SiteID}}">← {{.Site}}</a> · RADIUS over TLS for this access point</p>
+{{if not .Enabled}}<div class="card"><p>RadSEC is not enabled for site <b>{{.Site}}</b>. Enable it in the site settings first.</p><a class="btn" href="/sites/{{.SiteID}}">Open site settings</a></div>
+{{else}}
+<div class="card"><h2>How it works</h2><ul>
+<li>The access point connects <b>to the node</b> on TCP <b>{{.Port}}</b> using TLS and presents a client certificate. No shared secret travels over the network (the protocol fixes it to <code>radsec</code>).</li>
+<li>The key pair is generated <b>in your browser</b>; only the certificate request (public key) is sent here. The private key is never sent to or stored on the server, and is wiped from the page after you have saved it.</li>
+<li>Revoking a certificate here disconnects the AP from the node within about a minute.</li></ul></div>
+
+{{if .CanWrite}}<div class="card" id="radsec-app" data-sign-url="/aps/{{.APID}}/radsec/sign" data-csrf="{{.CSRF}}" data-ap="{{.AP}}">
+<h2>Generate a certificate</h2>
+<div id="rs-form"><div class="row"><div><label>Key type</label><select id="rs-algo"><option value="ec256">EC P-256 (recommended)</option><option value="ec384">EC P-384</option><option value="rsa2048">RSA 2048 (for older APs)</option><option value="rsa3072">RSA 3072</option></select></div>
+<div><label>Valid for (days)</label><input type="number" id="rs-days" value="730" min="1" max="1825"></div></div>
+<div class="actions"><button id="rs-go" type="button">Generate key pair in this browser</button></div>
+<p class="help">Needs a modern browser (WebCrypto). The page must be served over HTTPS.</p></div>
+<div id="rs-busy" class="hidden"><p>Generating…</p></div>
+<div id="rs-result" class="hidden">
+<div class="flash ok" id="rs-ok"></div>
+<ol class="steps"><li>Download the three files and upload them to the access point's RadSEC settings: its <b>private key</b>, its <b>certificate</b> and the <b>CA that signed the node's server certificate</b>.</li>
+<li>Point the AP's RADIUS server at the node: <b>{{if .Public}}this site's node IP{{else}}the node IP{{end}}</b>, TCP <b>{{.Port}}</b>, RadSEC/TLS enabled.</li>
+<li>Press <b>Wipe key now</b> once the files are saved.</li></ol>
+<div class="actions"><button type="button" id="rs-dl-key">Download private key (.pem)</button><button type="button" class="sec" id="rs-dl-cert">Certificate (.pem)</button><button type="button" class="sec" id="rs-dl-ca">Server CA (.pem)</button><button type="button" class="sec" id="rs-dl-all">Download all</button></div>
+<p class="help" id="rs-ca-note"></p>
+<div class="actions"><button type="button" class="danger" id="rs-wipe">Wipe key now</button><span class="help" id="rs-timer"></span></div></div>
+<div id="rs-wiped" class="hidden"><div class="flash ok">The private key has been wiped from this page. If you didn't save it, generate a new pair — the certificate above is useless without it.</div><div class="actions"><a class="btn sec" href="/aps/{{.APID}}/radsec">Done</a></div></div>
+<div id="rs-error" class="flash err hidden"></div>
+<noscript><p class="help">JavaScript is required to generate the key in the browser.</p></noscript></div>
+<script src="/static/radsec.js" defer></script>{{end}}
+
+<div class="card"><h2>Issued certificates</h2>{{if .Certs}}<table><tr><th>Serial</th><th>Key</th><th>Issued</th><th>Expires</th><th>By</th><th>Status</th><th></th></tr>
+{{range .Certs}}<tr><td class="mono">{{.Serial}}</td><td>{{.Algo}}</td><td>{{fmtTime .Created}}</td><td>{{fmtTime .NotAfter}}</td><td>{{.CreatedBy}}</td>
+<td>{{if .Revoked}}<span class="badge bad">revoked</span>{{else if .Expired}}<span class="badge bad">expired</span>{{else}}<span class="badge ok">active</span>{{end}}</td>
+<td>{{if and (not .Revoked) (not .Expired) ($.CanWrite)}}<form method="post" action="/radsec/{{.ID}}/revoke" data-confirm="Revoke this certificate? The AP will be disconnected."><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="danger sm">Revoke</button></form>{{end}}</td></tr>{{end}}</table>
+{{else}}<p class="empty">None yet.</p>{{end}}</div>{{end}}{{end}}

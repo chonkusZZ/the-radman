@@ -1,0 +1,13 @@
+{{define "content"}}<h1>Server certificates</h1><p class="sub">The certificate a RADIUS node presents to devices during EAP-TLS. Devices must trust its issuer.</p>
+<div class="card"><h2>Internal EAP CA</h2><p>Certificates issued here are signed by the internal EAP CA. Distribute this CA certificate to your devices (e.g. as a trusted root via Intune) so they trust the RADIUS server.</p>
+<p class="mono">SHA-256: {{.CAFP}}</p><a class="btn sec" href="/eapcerts/ca.pem">Download EAP CA certificate</a></div>
+<div class="card"><table><tr><th>Name</th><th>Source</th><th>Names</th><th>Expires</th><th>Used by</th><th></th></tr>
+{{range .Certs}}<tr><td>{{.Name}}</td><td><span class="badge">{{.Source}}</span></td><td>{{join .DNS ", "}}</td><td>{{fmtTime .NotAfter}}</td><td>{{join .Sites ", "}}</td>
+<td>{{if and $.CanWrite (not .Sites)}}<form method="post" action="/eapcerts/{{.ID}}/delete" data-confirm="Delete this certificate?"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="danger sm">Delete</button></form>{{end}}</td></tr>{{end}}</table>
+<p class="help">Internal certificates renew automatically 60 days before expiry. Uploaded certificates must be replaced manually.</p></div>
+{{if .CanWrite}}<div class="split"><div class="card"><h2>Issue from internal CA</h2><form method="post" action="/eapcerts/internal"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<label>Name</label><input type="text" name="name" required><label>Server name (CN)</label><input type="text" name="cn" placeholder="radius.example.com" required>
+<label>Additional DNS names</label><input type="text" name="dns"><div class="actions"><button type="submit">Issue certificate</button></div></form></div>
+<div class="card"><h2>Upload your own</h2><form method="post" action="/eapcerts/upload"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<label>Name</label><input type="text" name="name" required><label>Certificate chain (PEM, leaf first)</label><textarea name="cert" required></textarea><label>Private key (PEM)</label><textarea name="key" required></textarea>
+<div class="actions"><button type="submit">Upload</button></div></form></div></div>{{end}}{{end}}

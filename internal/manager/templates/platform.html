@@ -1,0 +1,16 @@
+{{define "content"}}<h1>Tenants</h1><p class="sub">Every customer is an isolated tenant with its own sites, nodes, PKI, certificates, logs and users.</p>
+<div class="grid"><div class="stat"><span>Tenants</span><b>{{.Total}}</b></div><div class="stat"><span>Nodes online</span><b>{{.NodesOnline}} / {{.NodesTotal}}</b></div>
+<div class="stat"><span>Accepted (24h)</span><b>{{.Sum.Accepts24h}}</b></div><div class="stat"><span>Rejected (24h)</span><b>{{.Sum.Rejects24h}}</b></div></div>
+{{if .Pending}}<div class="flash ok">{{.Pending}} node(s) across all tenants are waiting for enrollment.</div>{{end}}
+<div class="card"><form method="get" action="/platform" class="actions"><input type="text" name="q" value="{{.Q}}" placeholder="Search tenants…"><button class="sec" type="submit">Search</button></form>
+{{if .Tenants}}<table><tr><th>Tenant</th><th>Status</th><th>Sites</th><th>APs</th><th>Nodes online</th><th>Users</th><th>Auth 24h</th><th></th></tr>
+{{range .Tenants}}<tr><td><a href="/platform/tenants/{{.ID}}"><b>{{.Name}}</b></a><div class="help mono">{{.Slug}}</div></td>
+<td>{{if eq .Status "suspended"}}<span class="badge warn">suspended</span>{{else}}<span class="badge ok">active</span>{{end}}</td>
+<td>{{.Sites}}{{if .MaxSites}} / {{.MaxSites}}{{end}}</td><td>{{.APs}}{{if .MaxAPs}} / {{.MaxAPs}}{{end}}</td>
+<td><span class="badge {{if and .Nodes (eq .Online .Nodes)}}ok{{else if .Nodes}}warn{{end}}">{{.Online}} / {{.Nodes}}</span></td><td>{{.Members}}</td><td>{{.Accepts24h}} ✓ · {{.Rejects24h}} ✗</td>
+<td><form method="post" action="/tenant/switch"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="tenant" value="{{.ID}}"><button class="sm" type="submit">Open</button></form></td></tr>{{end}}</table>
+{{if gt .Pages 1}}<div class="actions">{{range $i := seq .Pages}}<a class="btn sec sm" href="/platform?q={{$.Q}}&page={{$i}}">{{$i}}</a>{{end}}</div>{{end}}
+{{else}}<p class="empty">No tenants {{if .Q}}match{{else}}yet — create the first one below{{end}}.</p>{{end}}</div>
+{{if .IsGlobalAdmin}}<div class="card"><h2>New tenant</h2><form method="post" action="/platform/tenants"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<label>Customer name</label><input type="text" name="name" required><div class="help">Each tenant gets its own private certificate authorities for RADIUS server certificates and RadSEC.</div>
+<div class="actions"><button type="submit">Create tenant</button></div></form></div>{{end}}{{end}}

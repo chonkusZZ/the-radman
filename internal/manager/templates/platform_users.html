@@ -1,0 +1,16 @@
+{{define "content"}}<h1>Users</h1><p class="sub">All accounts on the platform. Tenant access is granted from each tenant's page.</p>
+<div class="card"><form method="get" action="/platform/users" class="actions"><input type="text" name="q" value="{{.Q}}" placeholder="Search by e-mail or name…"><button class="sec" type="submit">Search</button></form>
+<table><tr><th>User</th><th>Platform role</th><th>Tenants</th><th>Last sign-in</th><th></th></tr>
+{{range .Users}}<tr><td>{{.Email}}<div class="help">{{.Name}}</div></td><td>{{if eq .Platform "global_admin"}}<span class="badge ok">Global administrator</span>{{else if eq .Platform "global_readonly"}}<span class="badge">Global read-only</span>{{else}}—{{end}}
+{{if .SSO}} <span class="badge">SSO</span>{{end}}{{if .TOTP}} <span class="badge ok">2FA</span>{{end}}{{if .Disabled}} <span class="badge bad">disabled</span>{{end}}</td>
+<td>{{join .Tenants ", "}}</td><td>{{fmtTime .LastLogin}}</td>
+<td>{{if $.IsGlobalAdmin}}<details><summary>edit</summary><form method="post" action="/platform/users/{{.ID}}/update"><input type="hidden" name="csrf" value="{{$.CSRF}}">
+<label>Platform role</label><select name="platform_role"><option value="">None (tenant access only)</option><option value="global_admin" {{if eq .Platform "global_admin"}}selected{{end}}>Global administrator</option><option value="global_readonly" {{if eq .Platform "global_readonly"}}selected{{end}}>Global read-only</option></select>
+{{if not .SSO}}<label>New password</label><input type="password" name="password" placeholder="leave blank to keep" autocomplete="new-password">{{end}}
+<label><input type="checkbox" name="disabled" value="1" {{if .Disabled}}checked{{end}}> Disabled</label><div class="actions"><button class="sm" type="submit">Save</button></div></form>
+<form method="post" action="/platform/users/{{.ID}}/delete" data-confirm="Delete this user?"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="danger sm" type="submit">Delete</button></form></details>{{end}}</td></tr>{{end}}</table></div>
+{{if .IsGlobalAdmin}}<div class="card"><h2>Add a local user</h2><form method="post" action="/platform/users"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="row"><div><label>E-mail</label><input type="email" name="email" required></div><div><label>Name</label><input type="text" name="name"></div>
+<div><label>Platform role</label><select name="platform_role"><option value="">None (grant tenant access afterwards)</option><option value="global_admin">Global administrator</option><option value="global_readonly">Global read-only</option></select></div>
+<div><label>Password (12+ chars)</label><input type="password" name="password" minlength="12" required autocomplete="new-password"></div></div>
+<div class="actions"><button type="submit">Add user</button></div></form></div>{{end}}{{end}}

@@ -1,0 +1,10 @@
+{{define "content"}}<h1 class="mono">{{.C.MAC}}</h1><p class="sub"><a href="/stats/clients">← Clients</a>{{if .C.Private}} · <span class="badge">private (randomised) address</span>{{end}}{{if .C.Subject}} · certificate <b>{{.C.Subject}}</b>{{end}}</p>
+<div class="grid"><div class="stat"><span>First seen</span><b class="sm">{{.C.First}}</b></div><div class="stat"><span>Last seen</span><b class="sm">{{.C.Last}}</b></div>
+<div class="stat"><span>Connects</span><b>{{.C.Accepts}}</b></div><div class="stat"><span>Rejects</span><b>{{.C.Rejects}}</b></div><div class="stat"><span>Sessions</span><b>{{.C.Sessions}}</b></div><div class="stat"><span>Roams</span><b>{{.C.Roams}}</b></div></div>
+<div class="split"><div class="card"><h2>Access points used</h2>{{if .APs}}<table><tr><th>AP</th><th>First</th><th>Last</th><th>Connects</th><th>Rejects</th><th>Sessions</th></tr>
+{{range .APs}}<tr><td>{{.AP}}</td><td class="nowrap">{{.First}}</td><td class="nowrap">{{.Last}}</td><td>{{.Accepts}}</td><td>{{.Rejects}}</td><td>{{.Sessions}}</td></tr>{{end}}</table>{{else}}<p class="empty">No AP information.</p>{{end}}</div>
+<div class="card"><h2>Data (last 30 days)</h2><p>Uploaded by the client: <b>{{.Up}}</b><br>Downloaded by the client: <b>{{.Down}}</b></p><p class="help">From accounting records; requires accounting to be enabled on the access points.</p>
+<p>Last seen on <b>{{.C.LastAP}}</b>{{if .C.LastSSID}} ({{.C.LastSSID}}){{end}}.</p></div></div>
+<div class="card"><h2>Recent activity</h2>{{if .Acts}}<table><tr><th>Time</th><th>Event</th><th>AP</th><th>SSID</th><th>VLAN</th><th>Detail</th></tr>
+{{range .Acts}}<tr><td class="nowrap">{{.Time}}</td><td>{{if eq .Detail "reject"}}<span class="badge bad">reject</span>{{else if eq .Detail "accept"}}<span class="badge ok">accept</span>{{else}}{{.Detail}}{{end}}{{if .Roam}} <span class="badge warn">roam</span>{{end}}</td><td>{{.AP}}</td><td>{{.SSID}}</td><td>{{.VLAN}}</td><td class="help">{{.Reason}}</td></tr>{{end}}</table>
+{{else}}<p class="empty">No detailed events are stored for this client (they are purged after the event retention period; the totals above are kept longer).</p>{{end}}</div>{{end}}

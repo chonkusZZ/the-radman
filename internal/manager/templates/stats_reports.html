@@ -1,0 +1,11 @@
+{{define "content"}}<h1>Stats</h1>{{template "statstabs" .}}
+<div class="card"><h2>Reports</h2><p class="sub">Choose a report and either download it as a spreadsheet-ready CSV or open a printable view (use your browser's <i>Save as PDF</i>).</p>
+<form method="get" action="/stats/report/ap-usage" id="rep" class="rep-form">
+<div class="row"><div><label>Report</label><select id="rtype"><option value="ap-usage">Access point usage</option><option value="top-talkers">Top talkers (clients by data used)</option><option value="rejects">Rejected authentications</option><option value="clients">Clients (first / last seen, connects, roams)</option></select></div>
+<div><label>Site</label><select name="site"><option value="">All sites</option>{{range .Sites}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></div>
+<div><label>Period</label><select name="preset" id="preset"><option value="24h">Last 24 hours</option><option value="7d" selected>Last 7 days</option><option value="30d">Last 30 days</option><option value="90d">Last 90 days</option><option value="custom">Custom…</option></select></div>
+<div><label>Rows (max)</label><input type="number" name="limit" min="1" max="100000" placeholder="default"></div></div>
+<div class="row" id="custom"><div><label>From</label><input type="date" name="from" value="{{.Today}}"></div><div><label>To (inclusive)</label><input type="date" name="to" value="{{.Today}}"></div><div><label>Time zone</label><input type="text" name="tz" value="{{.TZ}}"></div></div>
+<div class="actions"><button type="submit" data-report="html">View / print</button><button type="submit" class="sec" data-report="csv">Download CSV</button></div></form>
+<p class="help">Usage reports are built from detailed accounting/auth events, which are kept for {{.RetentionDays}} days. Upload/download are named from the client's point of view. Bytes include accounting "gigaword" counters for sessions over 4 GB (needs an up-to-date node).</p></div>{{end}}
+{{define "statstabs"}}<div class="tabs"><a href="/stats" class="{{if eq .Tab "overview"}}on{{end}}">Overview</a><a href="/stats/clients" class="{{if eq .Tab "clients"}}on{{end}}">Clients</a><a href="/stats/reports" class="{{if eq .Tab "reports"}}on{{end}}">Reports</a></div>{{end}}

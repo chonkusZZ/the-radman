@@ -1,0 +1,5 @@
+{{define "content"}}<h1>PKI profiles</h1><p class="sub">Trust anchors and revocation sources used to validate device certificates.</p>
+<div class="card">{{if .PKIs}}<table><tr><th>Name</th><th>Type</th><th>CAs</th><th>CRL URLs</th><th>Used by</th></tr>
+{{range .PKIs}}<tr><td><a href="/pki/{{.ID}}"><b>{{.Name}}</b></a></td><td><span class="badge">{{if eq .Kind "azure"}}Azure Cloud PKI{{else}}CA + CRL{{end}}</span></td><td>{{join .CAs ", "}}</td><td class="mono">{{range .URLs}}{{.}}<br>{{end}}</td><td>{{.Sites}} site(s)</td></tr>{{end}}</table>
+{{else}}<p class="empty">No PKI profiles yet.</p>{{end}}</div>
+{{if .CanWrite}}<div class="card"><h2>Add PKI profile</h2>{{template "pkiform" .}}</div>{{end}}{{end}}

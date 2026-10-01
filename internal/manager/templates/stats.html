@@ -1,0 +1,17 @@
+{{define "content"}}<h1>Stats</h1>{{template "statstabs" .}}
+<form method="get" action="/stats" class="card filters"><div class="row">
+<div><label>Period</label><select name="range" data-autosubmit><option value="hour" {{if eq .Range "hour"}}selected{{end}}>Per hour (48 h)</option><option value="day" {{if eq .Range "day"}}selected{{end}}>Per day (30 days)</option><option value="month" {{if eq .Range "month"}}selected{{end}}>Per month (12 months)</option></select></div>
+<div><label>Site</label><select name="site" data-autosubmit><option value="">All sites</option>{{range .Sites}}<option value="{{.ID}}" {{if .Selected}}selected{{end}}>{{.Name}}</option>{{end}}</select></div>
+<div><label>Time zone</label><input type="text" name="tz" value="{{.TZ}}"></div></div></form>
+<div class="grid"><div class="stat"><span>Accepted</span><b>{{.TotalA}}</b></div><div class="stat"><span>Rejected</span><b>{{.TotalR}}</b></div><div class="stat"><span>Reject rate</span><b>{{.RejectRate}}</b></div>
+<div class="stat"><span>Active clients</span><b>{{.Active}}</b></div><div class="stat"><span>New clients</span><b>{{.New}}</b></div></div>
+<div class="card"><h2>Accepted vs rejected — {{.RangeLabel}}</h2><div class="legend"><span class="sw c-ok"></span> Accepted <span class="sw c-bad"></span> Rejected</div>{{.Both}}</div>
+<div class="card"><h2>Authentication rejects — {{.RangeLabel}}</h2>{{.RejOnly}}
+<details><summary>Data table</summary><table><tr><th>Period</th><th>Accepted</th><th>Rejected</th></tr>{{range .Rows}}<tr><td>{{.Label}}</td><td>{{.Accepts}}</td><td>{{.Rejects}}</td></tr>{{end}}</table></details></div>
+<div class="split"><div class="card"><h2>Why authentications were rejected</h2>
+{{if .Reasons}}<table>{{range .Reasons}}<tr><td>{{.Category}}</td><td class="num">{{.N}}</td><td class="barcell"><span class="bar"><i class="bar-fill" data-pct="{{.Pct}}"></i></span> {{.Pct}}%</td></tr>{{end}}</table>
+{{else}}<p class="empty">No rejects in this period.</p>{{end}}</div>
+<div class="card"><h2>Latest rejects</h2>{{if .Recent}}<table><tr><th>Time</th><th>Client</th><th>AP</th><th>Reason</th></tr>
+{{range .Recent}}<tr><td class="nowrap">{{.Time}}</td><td class="mono">{{if .Client}}<a href="/stats/clients/{{.Client}}">{{.Client}}</a>{{end}}<div class="help">{{.Subject}}</div></td><td>{{.AP}}</td><td class="help">{{.Reason}}</td></tr>{{end}}</table>
+{{else}}<p class="empty">None.</p>{{end}}</div></div>{{end}}
+{{define "statstabs"}}<div class="tabs"><a href="/stats" class="{{if eq .Tab "overview"}}on{{end}}">Overview</a><a href="/stats/clients" class="{{if eq .Tab "clients"}}on{{end}}">Clients</a><a href="/stats/reports" class="{{if eq .Tab "reports"}}on{{end}}">Reports</a></div>{{end}}

@@ -1,0 +1,9 @@
+# Standalone edition: one organisation, simplified UI (no tenants). Same code, same features, same database layout.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.standalone.yml up -d
+#
+# (or put RADMAN_MODE=standalone in .env). To become an MSP later, start without this file: the data becomes the "Default" tenant.
+services:
+  manager:
+    environment:
+      RADMAN_MODE: standalone

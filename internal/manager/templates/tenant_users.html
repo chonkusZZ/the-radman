@@ -1,0 +1,11 @@
+{{define "content"}}<h1>Users</h1><p class="sub">People who can sign in to <b>{{.Tenant.Name}}</b>.</p>
+<div class="card">{{if .Members}}<table><tr><th>User</th><th>Role</th><th>Last sign-in</th><th></th></tr>
+{{range .Members}}<tr><td>{{.Email}}<div class="help">{{.Name}}{{if eq .Source "sso"}} · via single sign-on{{end}}</div></td><td>{{if eq .Role "tenant_admin"}}Administrator{{else}}Read-only{{end}}</td><td>{{fmtTime .LastLogin}}</td>
+<td>{{if ne .UserID $.User.ID}}<details><summary>edit</summary><form method="post" action="/users/update"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="user" value="{{.UserID}}">
+<label>Role</label><select name="role"><option value="tenant_admin" {{if eq .Role "tenant_admin"}}selected{{end}}>Administrator</option><option value="read_only" {{if eq .Role "read_only"}}selected{{end}}>Read-only</option></select><div class="actions"><button class="sm" type="submit">Save</button></div></form>
+<form method="post" action="/users/update" data-confirm="Remove this user's access?"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="user" value="{{.UserID}}"><button class="danger sm" name="remove" value="1">Remove access</button></form></details>{{end}}</td></tr>{{end}}</table>
+{{else}}<p class="empty">No users.</p>{{end}}</div>
+<div class="card"><h2>Add a user</h2><form method="post" action="/users"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="row"><div><label>E-mail</label><input type="email" name="email" required></div><div><label>Role</label><select name="role"><option value="read_only">Read-only</option><option value="tenant_admin">Administrator</option></select></div></div>
+<div class="row"><div><label>Name</label><input type="text" name="name"></div><div><label>Initial password (12+ chars)</label><input type="password" name="password" autocomplete="new-password"></div></div>
+<div class="help">Administrators can change everything in this tenant. Read-only users can view but never change anything.</div><div class="actions"><button type="submit">Add user</button></div></form></div>{{end}}

@@ -1,0 +1,83 @@
+{{define "content"}}<h1>Settings</h1>
+<div class="tabs"><a href="/settings?tab=general" class="{{if eq .Tab "general"}}on{{end}}">General</a><a href="/settings?tab=webtls" class="{{if eq .Tab "webtls"}}on{{end}}">Web certificate</a><a href="/settings?tab=sso" class="{{if eq .Tab "sso"}}on{{end}}">Single sign-on</a><a href="/settings?tab=database" class="{{if eq .Tab "database"}}on{{end}}">Database &amp; backups</a><a href="/settings?tab=branding" class="{{if eq .Tab "branding"}}on{{end}}">Branding</a></div>
+
+{{if eq .Tab "general"}}<div class="card"><form method="post" action="/settings/general"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<label>Public hostname</label><input type="text" name="public_host" value="{{.General.PublicHost}}" required><div class="help">How nodes and browsers reach this manager. Nodes connect to <code>{{.General.PublicHost}}:{{.UDPPort}}</code> (UDP).</div>
+<div class="row"><div><label>Node check-in interval (seconds)</label><input type="number" name="node_interval_secs" value="{{.General.NodeIntervalSecs}}"></div>
+<div><label>Event retention (days)</label><input type="number" name="event_retention_days" value="{{.General.EventRetentionDays}}"></div>
+<div><label>CRL refresh (minutes)</label><input type="number" name="crl_interval_mins" value="{{.General.CRLIntervalMins}}"></div></div>
+<div class="row"><div><label>Enrollment token lifetime (hours)</label><input type="number" name="enroll_token_hours" value="{{.General.EnrollTokenHours}}"></div>
+<div><label>Node certificate lifetime (days)</label><input type="number" name="node_cert_days" value="{{.General.NodeCertDays}}"></div>
+<div><label>Expired-certificate renewal grace (days)</label><input type="number" name="node_grace_days" value="{{.General.NodeGraceDays}}"></div></div>
+<div class="row"><div><label>Statistics retention (days)</label><input type="number" name="stats_retention_days" value="{{.General.StatsRetentionDays}}"><div class="help">Graphs, client history and roaming are kept this long. Raw events (needed for usage reports) follow "Event retention" above.</div></div>
+<div><label>Time zone for statistics</label><input type="text" name="timezone" value="{{.General.Timezone}}" placeholder="Europe/London"><div class="help">Used to bucket graphs by day/month and to label reports.</div></div></div>
+<div class="actions"><button type="submit">Save</button></div></form></div>{{end}}
+
+{{if eq .Tab "webtls"}}
+<div class="card"><h2>Current certificate</h2><p>Mode: <span class="badge ok">{{.TLS.Mode}}</span><br>Subject: {{.CertSubject}} · expires {{fmtTime .CertNotAfter}}<br>Names: {{.CertNames}}</p></div>
+<div class="split"><div class="card"><h2>Self-signed</h2><p class="help">Generated automatically. Browsers will warn; fine for a first look.</p>
+<form method="post" action="/settings/webtls"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="action" value="selfsigned"><div class="actions"><button type="submit" class="sec">Use self-signed</button><button type="submit" name="regenerate" value="1" class="sec">Regenerate</button></div></form></div>
+<div class="card"><h2>Let's Encrypt</h2><form method="post" action="/settings/webtls"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="action" value="letsencrypt">
+<label>Public DNS name(s)</label><input type="text" name="domains" value="{{.Domains}}" placeholder="radman.example.com"><label>Contact e-mail</label><input type="email" name="email" value="{{.TLS.Email}}">
+<label><input type="checkbox" name="staging" value="1" {{if .TLS.Staging}}checked{{end}}> Use the staging CA (testing)</label>
+<div class="help">Uses TLS-ALPN-01: the name must resolve to this server and public TCP port 443 must reach it. Certificates renew automatically.</div><div class="actions"><button type="submit">Use Let's Encrypt</button></div></form></div></div>
+<div class="card"><h2>Your own certificate / request one from a public CA</h2>
+<div class="split"><div><h3>1. Generate a certificate request (CSR)</h3>
+<form method="post" action="/settings/webtls/csr"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>Common name</label><input type="text" name="cn" value="{{.PublicHost}}"><label>Subject alternative names</label><input type="text" name="sans" placeholder="comma separated"><div class="actions"><button type="submit" class="sec">Generate CSR</button></div></form>
+{{if .CSR}}<h3>Pending request</h3><pre>{{.CSR}}</pre><a class="btn sec sm" href="/settings/webtls/csr.pem">Download .csr</a>{{end}}</div>
+<div><h3>2. Install the issued certificate</h3><form method="post" action="/settings/webtls/upload"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<label>Certificate (PEM, include intermediates)</label><textarea name="cert"></textarea>
+<label>Private key (PEM){{if .CSR}} — leave empty to use the key generated with the CSR{{end}}</label><textarea name="key"></textarea><div class="actions"><button type="submit">Install</button></div></form></div></div></div>{{end}}
+
+{{if eq .Tab "sso"}}<div class="card"><h2>SAML 2.0 single sign-on (Microsoft Entra ID and others)</h2>
+<p>Register this manager in your IdP with these values:</p><table><tr><th>Identifier (Entity ID)</th><td class="mono">{{if .SSO.EntityID}}{{.SSO.EntityID}}{{else}}{{.BaseURL}}/saml/metadata{{end}}</td></tr>
+<tr><th>Reply URL (ACS)</th><td class="mono">{{.BaseURL}}/saml/acs</td></tr><tr><th>SP metadata</th><td class="mono"><a href="/saml/metadata">{{.BaseURL}}/saml/metadata</a></td></tr></table>
+<div class="help">Entra ID: Enterprise applications → New application → Create your own → set Single sign-on to SAML, paste the values above, add a <i>groups</i> claim (group ID) and copy the "App Federation Metadata URL" below.</div>
+<form method="post" action="/settings/sso"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<label><input type="checkbox" name="enabled" value="1" {{if .SSO.Enabled}}checked{{end}}> Enable single sign-on</label>
+<label>IdP metadata URL</label><input type="url" name="metadata_url" value="{{.SSO.MetadataURL}}" placeholder="https://login.microsoftonline.com/<tenant>/federationmetadata/2007-06/federationmetadata.xml?appid=<app>">
+<label>…or IdP metadata XML</label><textarea name="metadata_xml">{{.SSO.MetadataXML}}</textarea>
+<label>Entity ID override (optional)</label><input type="text" name="entity_id" value="{{.SSO.EntityID}}">
+<div class="row"><div><label>E-mail attribute</label><input type="text" name="email_attr" value="{{.SSO.EmailAttr}}"></div><div><label>Name attribute</label><input type="text" name="name_attr" value="{{.SSO.NameAttr}}"></div><div><label>Groups attribute</label><input type="text" name="group_attr" value="{{.SSO.GroupAttr}}"></div></div>
+<label>Group → role mapping (one per line)</label><textarea name="group_roles">{{.SSOMap}}</textarea>
+{{if .Standalone}}<div class="help">Format <code>group-object-id=role</code> with role <code>admin</code>, <code>operator</code> or <code>read_only</code>. A user in several groups gets the highest role; users in no mapped group are refused. Roles are re-read at every sign-in.</div>
+{{else}}<div class="help">Format <code>group-object-id=role</code> with role one of <code>global_admin</code>, <code>global_readonly</code>, <code>tenant_admin@tenant-slug</code>, <code>read_only@tenant-slug</code>. A user can match several lines (e.g. administrator of two customers). Users in no mapped group are refused. Tenant access from SSO is re-synced at each sign-in. Customers connect their own identity provider from inside their tenant (<i>Single sign-on</i>).</div>{{end}}
+<label><input type="checkbox" name="allow_local" value="1" {{if .SSO.AllowLocal}}checked{{end}}> Keep local username/password sign-in enabled (recommended as break-glass)</label>
+<div class="actions"><button type="submit">Save</button></div></form></div>{{end}}
+
+{{if eq .Tab "branding"}}<div class="card"><h2>Logo</h2>
+<p class="help">Shown next to the product name in the sidebar and on the sign-in page. SVG only, up to 256 KB; scripts, event handlers and external references are rejected for safety.</p>
+{{if .HasLogo}}<div class="logo-preview"><img src="/branding/logo.svg?v={{.LogoVer}}" alt="Current logo"></div>{{if .LogoURL}}<p class="help">Downloaded from <span class="mono">{{.LogoURL}}</span></p>{{end}}
+<form method="post" action="/settings/branding" data-confirm="Remove the logo?"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="action" value="remove"><button class="danger" type="submit">Remove logo</button></form>
+{{else}}<p class="empty">No logo set.</p>{{end}}</div>
+<div class="split"><div class="card"><h2>Upload an SVG</h2><form method="post" action="/settings/branding" enctype="multipart/form-data"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="action" value="upload">
+<label>SVG file</label><input type="file" name="file" accept=".svg,image/svg+xml" required><div class="actions"><button type="submit">Upload</button></div></form></div>
+<div class="card"><h2>Fetch from a URL</h2><form method="post" action="/settings/branding"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="action" value="url">
+<label>SVG URL</label><input type="url" name="url" placeholder="https://example.com/logo.svg" required><div class="help">Downloaded once and stored in the manager; browsers never load it from the original site.</div><div class="actions"><button type="submit">Download and use</button></div></form></div></div>{{end}}
+
+{{if eq .Tab "database"}}{{with .DB}}
+<div class="grid"><div class="stat"><span>Database size</span><b>{{bytes .SizeBytes}}</b></div>
+<div class="stat"><span>Connections</span><b>{{.Connections}} / {{.MaxConns}}</b></div>
+<div class="stat"><span>Role</span><b>{{if .InRecovery}}standby{{else}}primary{{end}}</b></div>
+<div class="stat"><span>Last good backup</span><b>{{if .LastGood}}{{ago .LastGood.Finished}}{{else}}never{{end}}</b></div></div>
+{{range .Errors}}<div class="flash err">{{.}}</div>{{end}}
+<div class="card"><h2>Backups</h2>
+{{if .Backups}}<table><tr><th>Started</th><th>Kind</th><th>Result</th><th>Size</th><th>Detail</th></tr>{{range .Backups}}<tr><td>{{fmtTime .Started}}</td><td>{{.Kind}}</td><td><span class="badge {{if eq .Status "ok"}}ok{{else if eq .Status "failed"}}bad{{else}}warn{{end}}">{{.Status}}</span></td><td>{{if .Size}}{{bytes .Size}}{{end}}</td><td class="mono">{{.Detail}}</td></tr>{{end}}</table>
+{{else}}<p class="empty">No backup has reported in. Backups are performed by the database container (see <code>deploy/</code> and the README): continuous WAL archiving plus scheduled full/differential backups with point-in-time recovery.</p>{{end}}</div>
+<div class="card"><h2>WAL archiving (point-in-time recovery)</h2>
+<p>Archive mode: <span class="badge {{if eq .ArchiveMode "off"}}bad{{else}}ok{{end}}">{{.ArchiveMode}}</span> · archived segments: {{.Archiver.Archived}} · failures: <span class="badge {{if .Archiver.Failed}}warn{{else}}ok{{end}}">{{.Archiver.Failed}}</span></p>
+<p class="help">Last archived {{ago .Archiver.LastArchived}} {{if .Archiver.LastFailed}} · last failure {{ago .Archiver.LastFailed}} ({{.Archiver.LastFailedWAL}}){{end}}</p></div>
+<div class="card"><h2>Replication</h2>{{if .Replicas}}<table><tr><th>Standby</th><th>State</th><th>Mode</th><th>Replay lag</th><th>Behind</th></tr>{{range .Replicas}}<tr><td>{{.Addr}}</td><td>{{.State}}</td><td>{{.SyncState}}</td><td>{{.ReplayLag}}</td><td>{{bytes .LagBytes}}</td></tr>{{end}}</table>
+{{else}}<p class="empty">No standby is streaming from this database.</p>{{end}}
+<p class="help">Read replica for logs and dashboards: {{if .HasReplicaRO}}<span class="badge ok">in use</span>{{else}}not configured (<code>RADMAN_DATABASE_RO_URL</code>){{end}} · connection pool: {{.PoolInUse}} in use / {{.PoolTotal}} open</p></div>
+<div class="split"><div class="card"><h2>Event partitions</h2><p class="help">Auth and accounting events are stored in monthly partitions; retention drops whole months instantly.</p>
+<table><tr><th>Partition</th><th>≈ rows</th><th>Size</th></tr>{{range .Partitions}}<tr><td class="mono">{{.Name}}</td><td>{{if lt .Rows 0}}—{{else}}{{.Rows}}{{end}}</td><td>{{bytes .Bytes}}</td></tr>{{end}}</table></div>
+<div class="card"><h2>Largest tables</h2><table><tr><th>Table</th><th>Size</th></tr>{{range .Tables}}<tr><td class="mono">{{.Name}}</td><td>{{bytes .Bytes}}</td></tr>{{end}}</table></div></div>
+<div class="card"><h2>Master-key recovery kit</h2>
+<p>All CA keys, AP secrets and server keys in the database are encrypted with the <b>master key</b>. A database backup alone cannot be restored without it. {{if .KeyFromEnv}}The key is supplied through <code>RADMAN_MASTER_KEY</code> (keep it in your secret manager).{{else}}The key lives in the manager's data volume (<code>master.key</code>).{{end}}</p>
+<p>Download an encrypted recovery kit and store it <b>away from the database backups</b> (password manager / safe).</p>
+{{if $.IsGlobalAdmin}}<form method="post" action="/settings/keykit"><input type="hidden" name="csrf" value="{{$.CSRF}}">
+<div class="row"><div><label>Your password</label><input type="password" name="password" required autocomplete="current-password"></div><div><label>Kit passphrase (12+ chars)</label><input type="password" name="passphrase" minlength="12" required autocomplete="new-password"></div><div><label>Repeat passphrase</label><input type="password" name="passphrase2" minlength="12" required autocomplete="new-password"></div></div>
+<div class="actions"><button type="submit">Download recovery kit</button></div></form>{{end}}</div>
+{{end}}{{end}}
+{{end}}

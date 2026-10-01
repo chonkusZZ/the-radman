@@ -1,0 +1,9 @@
+{{define "content"}}<h1>{{.P.Name}}</h1><p class="sub"><a href="/pki">← PKI profiles</a> · used by {{if .Sites}}{{join .Sites ", "}}{{else}}no site yet{{end}}</p>
+<div class="card"><h2>Certificate authorities</h2><table><tr><th>Subject</th><th>Issuer</th><th>Expires</th><th>SHA-256 fingerprint</th></tr>
+{{range .CAs}}<tr><td>{{.Subject}} {{if .Root}}<span class="badge">root</span>{{end}}</td><td>{{.Issuer}}</td><td>{{fmtTime .NotAfter}}</td><td class="mono">{{.FP}}</td></tr>{{end}}</table></div>
+<div class="card"><h2>Revocation lists</h2>{{if .CRLs}}<table><tr><th>URL</th><th>Status</th><th>Last fetched</th><th>Next update</th><th>Revoked certs</th></tr>
+{{range .CRLs}}<tr><td class="mono">{{.URL}}</td><td>{{if .Err}}<span class="badge bad">{{.Err}}</span>{{else if .Stale}}<span class="badge bad">stale</span>{{else if .Fetched}}<span class="badge ok">ok</span>{{else}}<span class="badge warn">pending</span>{{end}}</td><td>{{fmtTime .Fetched}}</td><td>{{fmtTime .NextUpdate}}</td><td>{{.Revoked}}</td></tr>{{end}}</table>
+{{if .CanWrite}}<form method="post" action="/pki/{{.P.ID}}/refresh" class="actions"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="sec" type="submit">Refresh now</button></form>{{end}}
+{{else}}<p class="empty">No CRL configured: revocation is <b>not</b> checked for this profile.</p>{{end}}</div>
+{{if .CanWrite}}<div class="card"><h2>Edit</h2>{{template "pkiform" .}}</div>
+<div class="card"><form method="post" action="/pki/{{.P.ID}}/delete" data-confirm="Delete this PKI profile?"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="danger" type="submit">Delete profile</button></form></div>{{end}}{{end}}

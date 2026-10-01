@@ -1,0 +1,19 @@
+{{define "content"}}<h1>Single sign-on</h1><p class="sub">Let <b>{{.Tenant.Name}}</b>'s users sign in with their own identity provider (Microsoft Entra ID or any SAML 2.0 IdP). Access is limited to this tenant.</p>
+<div class="card"><h2>1. Register this service in your identity provider</h2>
+<table><tr><th>Identifier (Entity ID)</th><td class="mono">{{.EntityID}}</td></tr><tr><th>Reply URL (ACS)</th><td class="mono">{{.ACS}}</td></tr>
+<tr><th>Service-provider metadata</th><td class="mono"><a href="{{.MetaURL}}">{{.MetaURL}}</a></td></tr><tr><th>Your sign-in page</th><td class="mono">{{.LoginURL}}</td></tr></table>
+<div class="help">Entra ID: Enterprise applications → New → Create your own → Single sign-on → SAML. Paste the values above, add a <i>groups</i> claim (group ID), and copy the "App Federation Metadata URL". Give your users the sign-in page link.</div></div>
+<form method="post" action="/sso"><input type="hidden" name="csrf" value="{{.CSRF}}"><div class="card"><h2>2. Connect the identity provider</h2>
+<label><input type="checkbox" name="enabled" value="1" {{if .SSO.Enabled}}checked{{end}}> Enable single sign-on for this organisation</label>
+<label>IdP metadata URL</label><input type="url" name="metadata_url" value="{{.SSO.MetadataURL}}" placeholder="https://login.microsoftonline.com/<tenant>/federationmetadata/2007-06/federationmetadata.xml?appid=<app>">
+<div class="help">Must be a public address. Alternatively paste the metadata XML:</div><textarea name="metadata_xml">{{.SSO.MetadataXML}}</textarea>
+<label>Entity ID override (optional)</label><input type="text" name="entity_id" value="{{.SSO.EntityID}}">
+<div class="row"><div><label>E-mail attribute</label><input type="text" name="email_attr" value="{{.SSO.EmailAttr}}"></div><div><label>Name attribute</label><input type="text" name="name_attr" value="{{.SSO.NameAttr}}"></div><div><label>Groups attribute</label><input type="text" name="group_attr" value="{{.SSO.GroupAttr}}"></div></div></div>
+<div class="card"><h2>3. Who gets what</h2><label>Group → role (one per line: <code>group-id=tenant_admin</code> or <code>group-id=read_only</code>)</label><textarea name="group_roles">{{.SSOMap}}</textarea>
+<label>Users in no mapped group</label><select name="default_role"><option value="" {{if not .SSO.DefaultRole}}selected{{end}}>Refuse access</option><option value="read_only" {{if eq .SSO.DefaultRole "read_only"}}selected{{end}}>Allow as read-only</option></select>
+<label><input type="checkbox" name="require_sso" value="1" {{if .SSO.RequireSSO}}checked{{end}}> Disable local passwords for users of this tenant (single sign-on only)</label>
+<div class="help">Roles are re-read from the IdP at every sign-in. Users signing in here can never gain access to any other tenant or to the platform.</div>
+<label>E-mail domains{{if not .CanEditDomains}} (managed by your service provider){{end}}</label>
+{{if .CanEditDomains}}<input type="text" name="domains" value="{{.Domains}}" placeholder="example.com, example.co.uk"><div class="help">Lets users reach this sign-in from the main login page by typing their e-mail address, and restricts the IdP to these domains. Each domain can belong to one tenant.</div>
+{{else}}<p class="mono">{{if .Domains}}{{.Domains}}{{else}}none{{end}}</p><div class="help">Ask your service provider to enable e-mail based discovery on the main sign-in page.</div>{{end}}
+<div class="actions"><button type="submit">Save</button></div></div></form>{{end}}

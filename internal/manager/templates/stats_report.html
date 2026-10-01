@@ -1,0 +1,5 @@
+{{define "content"}}<div class="noprint actions"><a class="btn sec sm" href="/stats/reports">← Reports</a><a class="btn sm" href="/stats/report/{{.Kind}}?{{.Query}}&format=csv">Download CSV</a><button class="sec sm" type="button" data-print>Print / Save as PDF</button></div>
+<div class="report"><h1>{{.R.Title}}</h1><p class="sub">{{.Tenant.Name}} · {{.R.Range}} ({{.R.TZ}}) · generated {{.Generated}}</p>
+{{if .R.Note}}<div class="flash ok">{{.R.Note}}</div>{{end}}
+{{if .R.Rows}}<table class="report-table"><tr>{{range .R.Columns}}<th>{{.}}</th>{{end}}</tr>{{range .R.Rows}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}</table>
+{{else}}<p class="empty">No data for this period.</p>{{end}}</div>{{end}}

@@ -1,0 +1,13 @@
+{{define "content"}}<h1>Users</h1><p class="sub">Who can sign in. <b>Administrators</b> manage everything including these settings; <b>operators</b> manage sites, access points, nodes, PKI and certificates; <b>read-only</b> users can look but never change anything.</p>
+<div class="card"><table><tr><th>User</th><th>Role</th><th>Last sign-in</th><th></th></tr>
+{{range .Users}}<tr><td>{{.Email}}<div class="help">{{.Name}}</div></td><td>{{.RoleLabel}}{{if .SSO}} <span class="badge">SSO</span>{{end}}{{if .TOTP}} <span class="badge ok">2FA</span>{{end}}{{if .Disabled}} <span class="badge bad">disabled</span>{{end}}</td><td>{{fmtTime .LastLogin}}</td>
+<td><details><summary>edit</summary><form method="post" action="/users/{{.ID}}/update"><input type="hidden" name="csrf" value="{{$.CSRF}}">
+{{if .SSO}}<p class="help">Role comes from the identity provider's groups.</p>{{else}}<label>Role</label><select name="role"><option value="admin" {{if eq .Role "admin"}}selected{{end}}>Administrator</option><option value="operator" {{if eq .Role "operator"}}selected{{end}}>Operator</option><option value="read_only" {{if eq .Role "read_only"}}selected{{end}}>Read-only</option></select>
+<label>New password</label><input type="password" name="password" placeholder="leave blank to keep" autocomplete="new-password">{{end}}
+<label><input type="checkbox" name="disabled" value="1" {{if .Disabled}}checked{{end}}> Disabled</label><div class="actions"><button class="sm" type="submit">Save</button></div></form>
+<form method="post" action="/users/{{.ID}}/delete" data-confirm="Delete this user?"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="danger sm" type="submit">Delete</button></form></details></td></tr>{{end}}</table></div>
+<div class="card"><h2>Add a user</h2><form method="post" action="/users"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="row"><div><label>E-mail</label><input type="email" name="email" required></div><div><label>Name</label><input type="text" name="name"></div>
+<div><label>Role</label><select name="role"><option value="read_only">Read-only</option><option value="operator">Operator</option><option value="admin">Administrator</option></select></div>
+<div><label>Password (12+ chars)</label><input type="password" name="password" minlength="12" required autocomplete="new-password"></div></div>
+<div class="actions"><button type="submit">Add user</button></div></form></div>{{end}}
