@@ -32,6 +32,7 @@ func (a *App) BuildNodeConfig(ctx context.Context, siteID, nodeID string) (*prot
 	cfg.IntervalSeconds = a.General(ctx).NodeIntervalSecs
 	var certPEM, keyEnc string
 	if nodeID != "" {
+		a.St.DB.QueryRow(ctx, `SELECT log_level, log_retention_days FROM nodes WHERE id=$1::uuid AND site_id=$2::uuid`, nodeID, siteID).Scan(&cfg.LogLevel, &cfg.LogRetentionDays)
 		a.St.DB.QueryRow(ctx, `SELECT eap_cert_pem, eap_key_enc FROM nodes WHERE id=$1::uuid AND site_id=$2::uuid AND eap_cert_pem <> ''`, nodeID, siteID).Scan(&certPEM, &keyEnc)
 	}
 	if certPEM == "" {

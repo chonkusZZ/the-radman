@@ -20,6 +20,26 @@ radman-node install &amp;&amp; radman-node start</pre>
 {{else}}<p>This node uses the <b>site's</b> server certificate.</p>{{end}}
 {{if .CanWrite}}<form method="post" action="/nodes/{{.N.ID}}/names"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>Names (comma-separated host names / IP addresses; first = CN)</label><input type="text" name="server_names" value="{{.NamesText}}" placeholder="radius.example.com, 10.1.0.5">
 <div class="help">Devices must trust the tenant's EAP CA (<a href="/eapcerts">Server certificates</a>) and, if they validate the server name, the name they connect to must be listed here. Leave empty to use the site's certificate.</div><div class="actions"><button type="submit" class="sec">Save names</button></div></form>{{end}}</div>
+<div class="card"><h2>Logging</h2>
+{{if ne .N.Status "pending"}}<table>
+<tr><th>Running at</th><td>{{if .LogReportedLevel}}level <b>{{.LogReportedLevel}}</b>, files kept {{.LogReportedDays}} day(s) · {{bytes .LogBytes}} on disk {{if .LogApplied}}<span class="badge ok">matches the setting below</span>{{else}}<span class="badge warn">will change at the next check-in</span>{{end}}{{else}}not reported yet{{end}}</td></tr></table>{{end}}
+{{if .CanWrite}}<form method="post" action="/nodes/{{.N.ID}}/logging"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="row"><div><label>Log level</label><select name="log_level">{{range .LogLevels}}<option value="{{.}}"{{if eq . $.LogLevel}} selected{{end}}>{{.}}</option>{{end}}</select></div>
+<div><label>Log age (days)</label><input type="number" name="log_retention_days" min="1" max="365" value="{{.LogDays}}" required></div></div>
+<div class="help"><b>error</b> = failures only · <b>warning</b> = also problems such as dropped packets from unknown access points · <b>info</b> (default) = also every authentication result and node activity · <b>debug</b> = also accepted-authentication and accounting detail. Secrets and keys are never logged. The node deletes log files older than the age you set (one file per day), and applies both settings at its next check-in — even while offline it keeps the last ones.</div>
+<div class="actions"><button type="submit" class="sec">Save logging settings</button></div></form>
+{{else}}<p>Level <b>{{.LogLevel}}</b>, log files kept {{.LogDays}} day(s).</p>{{end}}
+{{if eq .N.Status "active"}}<h3>Collect logs</h3>
+{{if .CanWrite}}{{if not .LogSupported}}<p class="help">This node's version cannot send its logs yet — deploy the current node binary first.</p>
+{{else if .LogPending}}<p><span class="badge warn">waiting for the node's next check-in</span></p>
+{{else}}<form method="post" action="/nodes/{{.N.ID}}/logs/collect"><input type="hidden" name="csrf" value="{{.CSRF}}"><div class="actions"><button type="submit">Collect logs</button></div><div class="help">Asks the node to zip its log files and upload them at its next check-in (within about a minute). The download appears below when they arrive.</div></form>{{end}}{{end}}
+{{if .LogBundles}}<table><tr><th>Requested</th><th>By</th><th>Status</th><th>Size</th><th></th></tr>
+{{range .LogBundles}}<tr><td class="nowrap">{{fmtTime .Requested}}</td><td>{{.By}}</td>
+<td>{{if eq .Status "ready"}}<span class="badge ok">ready</span>{{else if eq .Status "failed"}}<span class="badge bad">failed</span>{{else if eq .Status "receiving"}}<span class="badge warn">uploading</span>{{else}}<span class="badge warn">waiting for check-in</span>{{end}}{{if .Error}}<div class="err-text">{{.Error}}</div>{{end}}</td>
+<td class="nowrap">{{if eq .Status "ready"}}{{bytes .Size}}{{end}}</td>
+<td class="nowrap">{{if eq .Status "ready"}}<a class="btn sm" href="/nodes/{{$.N.ID}}/logs/{{.ID}}/download">Download .zip</a>{{end}}
+{{if $.CanWrite}}<form method="post" action="/nodes/{{$.N.ID}}/logs/{{.ID}}/delete" class="inline" data-confirm="Delete this log bundle?"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="danger sm" type="submit">Delete</button></form>{{end}}</td></tr>{{end}}</table>
+<p class="help">Bundles are kept for 14 days (the newest 5 per node).</p>{{end}}{{end}}</div>
 {{if .CanWrite}}<div class="card"><h2>Manage</h2><div class="actions">
 {{if ne .N.Status "pending"}}<form method="post" action="/nodes/{{.N.ID}}/regen" data-confirm="Revoke the current certificate and issue a new enrollment token?"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="sec" type="submit">Re-enroll (new token)</button></form>{{end}}
 {{if eq .N.Status "active"}}<form method="post" action="/nodes/{{.N.ID}}/revoke" data-confirm="Revoke this node? It will no longer be able to check in."><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="danger" type="submit">Revoke</button></form>{{end}}

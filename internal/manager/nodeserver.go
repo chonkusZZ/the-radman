@@ -150,6 +150,18 @@ func (a *App) dispatch(ctx context.Context, certs []*x509.Certificate, remote st
 			return fail(err)
 		}
 		return &proto.Response{OK: true, Checkin: r}
+	case "logs":
+		id, err := a.authenticate(ctx, certs)
+		if err != nil {
+			return fail(err)
+		}
+		if id == nil {
+			return fail(errors.New("client certificate required"))
+		}
+		if err := a.receiveLogs(ctx, id, req.Logs); err != nil {
+			return fail(err)
+		}
+		return &proto.Response{OK: true}
 	}
 	return fail(errBadRequest)
 }
@@ -238,6 +250,9 @@ func (a *App) checkin(ctx context.Context, id *nodeIdentity, r *proto.CheckinReq
 	}
 	if cfgErr != nil {
 		a.Log.Printf("node %s: cannot build config: %v", id.ID, cfgErr)
+	}
+	if contains(r.Stats.Features, proto.FeatureLogs) && !id.Expired {
+		resp.CollectLogs = a.pendingLogBundle(ctx, id.ID)
 	}
 	return resp, nil
 }

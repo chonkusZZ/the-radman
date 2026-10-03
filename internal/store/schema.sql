@@ -257,3 +257,27 @@ ALTER TABLE nodes ADD COLUMN IF NOT EXISTS eap_names text[] NOT NULL DEFAULT '{}
 ALTER TABLE nodes ADD COLUMN IF NOT EXISTS eap_cert_pem text NOT NULL DEFAULT '';
 ALTER TABLE nodes ADD COLUMN IF NOT EXISTS eap_key_enc text NOT NULL DEFAULT '';
 ALTER TABLE nodes ADD COLUMN IF NOT EXISTS eap_not_after timestamptz;
+
+-- Node logging: level and age pushed to the node in its config; log bundles collected on demand at the next check-in.
+ALTER TABLE nodes ADD COLUMN IF NOT EXISTS log_level text NOT NULL DEFAULT 'info';
+ALTER TABLE nodes ADD COLUMN IF NOT EXISTS log_retention_days int NOT NULL DEFAULT 30;
+
+CREATE TABLE IF NOT EXISTS node_log_bundles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  node_id uuid NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  requested_by text NOT NULL DEFAULT '',
+  requested_at timestamptz NOT NULL DEFAULT now(),
+  status text NOT NULL DEFAULT 'requested', -- requested | receiving | ready | failed
+  chunks int NOT NULL DEFAULT 0,
+  size bigint NOT NULL DEFAULT 0,
+  error text NOT NULL DEFAULT '',
+  completed_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS node_log_bundles_node ON node_log_bundles(node_id, requested_at DESC);
+
+CREATE TABLE IF NOT EXISTS node_log_chunks (
+  bundle_id uuid NOT NULL REFERENCES node_log_bundles(id) ON DELETE CASCADE,
+  idx int NOT NULL,
+  data bytea NOT NULL,
+  PRIMARY KEY (bundle_id, idx)
+);

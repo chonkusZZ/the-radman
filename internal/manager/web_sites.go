@@ -68,6 +68,10 @@ func (s *server) routes() {
 	m.HandleFunc("POST /nodes/{id}/revoke", res("node", true, s.nodeRevoke))
 	m.HandleFunc("POST /nodes/{id}/regen", res("node", true, s.nodeRegen))
 	m.HandleFunc("POST /nodes/{id}/names", res("node", true, s.nodeNames))
+	m.HandleFunc("POST /nodes/{id}/logging", res("node", true, s.nodeLogging))
+	m.HandleFunc("POST /nodes/{id}/logs/collect", res("node", true, s.nodeLogsCollect))
+	m.HandleFunc("GET /nodes/{id}/logs/{bid}/download", res("node", false, s.nodeLogsDownload))
+	m.HandleFunc("POST /nodes/{id}/logs/{bid}/delete", res("node", true, s.nodeLogsDelete))
 	m.HandleFunc("POST /nodes/{id}/delete", res("node", true, s.nodeDelete))
 
 	m.HandleFunc("GET /pki", a(pTenantRead, s.pkiList))
@@ -636,6 +640,18 @@ func (s *server) nodeDetail(w http.ResponseWriter, r *http.Request, u *User) {
 	d["Names"], d["NamesText"], d["NamesExpire"] = names, strings.Join(names, ", "), certExp
 	d["Public"] = s.a.General(r.Context()).PublicHost
 	d["UDPPort"] = s.a.quicPort
+	var logLevel string
+	var logDays int
+	var rawStats []byte
+	s.a.St.DB.QueryRow(r.Context(), `SELECT log_level, log_retention_days, stats FROM nodes WHERE id=$1::uuid`, n.ID).Scan(&logLevel, &logDays, &rawStats)
+	var nst proto.Stats
+	json.Unmarshal(rawStats, &nst)
+	d["LogLevel"], d["LogDays"], d["LogLevels"] = logLevel, logDays, nodeLogLevels
+	d["LogApplied"] = nst.LogLevel == logLevel && nst.LogRetentionDays == logDays
+	d["LogReportedLevel"], d["LogReportedDays"], d["LogBytes"] = nst.LogLevel, nst.LogRetentionDays, nst.LogBytes
+	d["LogSupported"] = contains(nst.Features, proto.FeatureLogs)
+	d["LogBundles"] = s.a.logBundles(r.Context(), n.ID)
+	d["LogPending"] = s.a.pendingLogBundle(r.Context(), n.ID) != ""
 	if n.Status == "pending" && u.CanWrite(u.Tenant) {
 		var enc string
 		s.a.St.DB.QueryRow(r.Context(), `SELECT token_enc FROM nodes WHERE id=$1::uuid`, n.ID).Scan(&enc)

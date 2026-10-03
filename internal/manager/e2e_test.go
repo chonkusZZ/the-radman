@@ -1,16 +1,18 @@
 package manager
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"io"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 
 	"radman/internal/eaptest"
 	"radman/internal/nodeagent"
+	"radman/internal/nodelog"
 	"radman/internal/pki"
 	"radman/internal/proto"
 )
@@ -95,7 +98,7 @@ func TestHubAndSpoke(t *testing.T) {
 	fp, _ := pki.FingerprintPEM(a.NodeCAPEM())
 	b, _ := json.Marshal(nodeagent.EnrollConfig{Manager: a.Opt.UDPAddr, CAFP: fp, Token: tok}) // CA learned via pinned fingerprint
 	os.WriteFile(filepath.Join(dir, "enroll.json"), b, 0o600)
-	agent := nodeagent.New(dir, log.New(io.Discard, "", 0))
+	agent := nodeagent.New(dir, nodelog.New(filepath.Join(dir, "logs"), nil))
 	go agent.Run(ctx)
 
 	waitFor(t, "node enrollment + config", 15*time.Second, func() bool {
@@ -156,6 +159,81 @@ func TestHubAndSpoke(t *testing.T) {
 	})
 	if r, err := eaptest.Authenticate("127.0.0.1:"+itoa(authPort), "changed-secret", "device-1", tc); err != nil || r.Code != radius.CodeAccessAccept {
 		t.Fatalf("auth with new secret: %v", err)
+	}
+
+	// node logging, end to end: the level and age set in the manager reach the node, the node deletes log files
+	// older than the age, and a collection request is answered at the next check-in with a downloadable zip
+	logDir := filepath.Join(dir, "logs")
+	os.MkdirAll(logDir, 0o700)
+	ancient := filepath.Join(logDir, "node-2020-01-01.log")
+	recent := filepath.Join(logDir, "node-"+time.Now().AddDate(0, 0, -1).Format("2006-01-02")+".log")
+	os.WriteFile(ancient, []byte("ancient line\n"), 0o600)
+	os.WriteFile(recent, []byte("yesterday line\n"), 0o600)
+	os.Chtimes(ancient, time.Now().AddDate(-6, 0, 0), time.Now().AddDate(-6, 0, 0))
+	os.Chtimes(recent, time.Now().Add(-24*time.Hour), time.Now().Add(-24*time.Hour))
+	a.St.DB.Exec(ctx, `UPDATE nodes SET log_level='debug', log_retention_days=3 WHERE id::text=$1`, nodeID)
+	waitFor(t, "node deletes log files older than the age", 40*time.Second, func() bool {
+		_, err := os.Stat(ancient)
+		return err != nil
+	})
+	waitFor(t, "node reports the new log settings", 40*time.Second, func() bool {
+		var lvl string
+		var days int
+		a.St.DB.QueryRow(ctx, `SELECT COALESCE(stats->>'log_level',''), COALESCE((stats->>'log_retention_days')::int,0) FROM nodes WHERE id::text=$1`, nodeID).Scan(&lvl, &days)
+		return lvl == "debug" && days == 3
+	})
+	if _, err := os.Stat(recent); err != nil {
+		t.Fatal("a log file inside the age was deleted")
+	}
+	var bundleID string
+	a.St.DB.QueryRow(ctx, `INSERT INTO node_log_bundles(node_id,requested_by) VALUES($1::uuid,'e2e') RETURNING id::text`, nodeID).Scan(&bundleID)
+	waitFor(t, "node delivers the log bundle", 40*time.Second, func() bool {
+		var st string
+		a.St.DB.QueryRow(ctx, `SELECT status FROM node_log_bundles WHERE id=$1::uuid`, bundleID).Scan(&st)
+		return st == "ready"
+	})
+	var zipBytes []byte
+	rows, _ := a.St.DB.Query(ctx, `SELECT data FROM node_log_chunks WHERE bundle_id=$1::uuid ORDER BY idx`, bundleID)
+	for rows.Next() {
+		var d []byte
+		rows.Scan(&d)
+		zipBytes = append(zipBytes, d...)
+	}
+	rows.Close()
+	zr, err := zip.NewReader(bytes.NewReader(zipBytes), int64(len(zipBytes)))
+	if err != nil {
+		t.Fatalf("delivered bundle is not a zip: %v", err)
+	}
+	have := map[string]string{}
+	for _, f := range zr.File {
+		rc, _ := f.Open()
+		b, _ := io.ReadAll(rc)
+		rc.Close()
+		have[f.Name] = string(b)
+	}
+	if !strings.Contains(have["info.txt"], "log level: debug") || !strings.Contains(have["info.txt"], "log retention: 3 day(s)") {
+		t.Errorf("info.txt: %q", have["info.txt"])
+	}
+	if _, ok := have["logs/"+filepath.Base(recent)]; !ok {
+		t.Errorf("bundle lacks the recent log file: %v", have)
+	}
+	if _, ok := have["logs/"+filepath.Base(ancient)]; ok {
+		t.Error("bundle contains a file the node had already pruned")
+	}
+	todays := ""
+	for name, body := range have {
+		if strings.HasPrefix(name, "logs/node-"+time.Now().Format("2006-01-02")) {
+			todays = body
+		}
+	}
+	if !strings.Contains(todays, "log level changed from info to debug") || !strings.Contains(todays, "DEBUG") && !strings.Contains(todays, "INFO ") {
+		t.Errorf("today's log does not show the level change:\n%s", todays)
+	}
+	if strings.Contains(string(zipBytes), "changed-secret") || strings.Contains(todays, "secretsecret") {
+		t.Error("a shared secret ended up in the logs")
+	}
+	if c := a.pendingLogBundle(ctx, nodeID); c != "" {
+		t.Errorf("manager still asks for logs after delivery: %s", c)
 	}
 
 	// revoke: node can no longer check in

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"os"
@@ -21,6 +20,7 @@ import (
 
 	"radman/internal/crl"
 	"radman/internal/netguard"
+	"radman/internal/nodelog"
 	"radman/internal/pki"
 	"radman/internal/proto"
 )
@@ -51,7 +51,7 @@ type managerInfo struct {
 
 type Agent struct {
 	Dir     string
-	Log     *log.Logger
+	Log     *nodelog.Logger
 	q       *Queue
 	started time.Time
 
@@ -62,9 +62,11 @@ type Agent struct {
 	srv      *Server
 	ports    [3]int
 	interval time.Duration
+
+	collecting int32 // 1 while a log bundle upload is in progress
 }
 
-func New(dir string, l *log.Logger) *Agent {
+func New(dir string, l *nodelog.Logger) *Agent {
 	return &Agent{Dir: dir, Log: l, started: time.Now(), interval: 60 * time.Second}
 }
 
@@ -85,20 +87,21 @@ func (a *Agent) Run(ctx context.Context) error {
 		var cfg proto.SiteConfig
 		if json.Unmarshal(b, &cfg) == nil {
 			if err := a.applyConfig(&cfg, false); err != nil {
-				a.Log.Printf("cached config unusable: %v", err)
+				a.Log.Errorf("cached config unusable: %v", err)
 			} else {
-				a.Log.Printf("serving cached site config %q", cfg.SiteName)
+				a.Log.Infof("serving cached site config %q", cfg.SiteName)
 			}
 		}
 	}
 
 	go a.crlRefresher(ctx)
+	go a.logPruner(ctx)
 
 	// 2. Enrol if needed, then check in forever.
 	for ctx.Err() == nil {
 		if err := a.loadIdentity(); err != nil {
 			if err := a.enroll(ctx); err != nil {
-				a.Log.Printf("enrollment: %v (retrying in 30s)", err)
+				a.Log.Errorf("enrollment: %v (retrying in 30s)", err)
 				sleep(ctx, 30*time.Second)
 				continue
 			}
@@ -111,7 +114,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		wait := a.interval
 		if err != nil {
 			fails++
-			a.Log.Printf("check-in failed (%d): %v - continuing standalone", fails, err)
+			a.Log.Warnf("check-in failed (%d): %v - continuing standalone", fails, err)
 			wait = time.Duration(min(fails, 6)) * 30 * time.Second
 			if wait > 5*time.Minute {
 				wait = 5 * time.Minute
@@ -270,7 +273,7 @@ func (a *Agent) enroll(ctx context.Context) error {
 		return err
 	}
 	os.Remove(p) // the single-use token is now spent
-	a.Log.Printf("enrolled as node %s", a.mgr.NodeID)
+	a.Log.Infof("enrolled as node %s", a.mgr.NodeID)
 	return a.loadIdentity()
 }
 
@@ -292,6 +295,7 @@ func (a *Agent) checkin(ctx context.Context) error {
 	}
 	req.Stats.UptimeSeconds = int64(time.Since(a.started).Seconds())
 	req.Stats.QueueDepth = a.q.Len()
+	a.logStats(&req.Stats)
 	events := a.q.Peek(500)
 	req.Events = events
 
@@ -320,18 +324,22 @@ func (a *Agent) checkin(ctx context.Context) error {
 		if err := a.loadIdentity(); err != nil {
 			return fmt.Errorf("installing renewed certificate: %w", err)
 		}
-		a.Log.Printf("client certificate renewed, expires %s", a.leaf.NotAfter.Format(time.RFC3339))
+		a.Log.Infof("client certificate renewed, expires %s", a.leaf.NotAfter.Format(time.RFC3339))
 	}
 	if r.Config != nil {
 		if err := a.applyConfig(r.Config, true); err != nil {
 			return fmt.Errorf("applying new config: %w", err)
 		}
-		a.Log.Printf("applied new site config (hash %.12s)", a.srv.Runtime().Hash)
+		a.Log.Infof("applied new site config (hash %.12s)", a.srv.Runtime().Hash)
+	}
+	if r.CollectLogs != "" {
+		a.startLogCollection(ctx, r.CollectLogs)
 	}
 	return nil
 }
 
 func (a *Agent) applyConfig(cfg *proto.SiteConfig, persist bool) error {
+	a.applyLogSettings(cfg)
 	rt, err := BuildRuntime(cfg)
 	if err != nil {
 		return err
@@ -396,7 +404,7 @@ func (a *Agent) crlRefresher(ctx context.Context) {
 					continue
 				}
 				st.SetCRL(u, der, rl, "direct")
-				a.Log.Printf("refreshed CRL directly: %s", u)
+				a.Log.Infof("refreshed CRL directly: %s", u)
 			}
 		}
 	}

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -16,6 +15,7 @@ import (
 	"github.com/kardianos/service"
 
 	"radman/internal/nodeagent"
+	"radman/internal/nodelog"
 )
 
 var version = "dev"
@@ -50,7 +50,7 @@ type program struct {
 	dir    string
 	cancel context.CancelFunc
 	done   chan struct{}
-	log    *log.Logger
+	log    *nodelog.Logger
 }
 
 func (p *program) Start(service.Service) error {
@@ -60,7 +60,7 @@ func (p *program) Start(service.Service) error {
 		defer close(p.done)
 		nodeagent.Version = version
 		if err := nodeagent.New(p.dir, p.log).Run(ctx); err != nil {
-			p.log.Printf("fatal: %v", err)
+			p.log.Errorf("fatal: %v", err)
 		}
 	}()
 	return nil
@@ -72,17 +72,26 @@ func (p *program) Stop(service.Service) error {
 	return nil
 }
 
-func newLogger(dir string) *log.Logger {
-	os.MkdirAll(dir, 0o700)
-	path := filepath.Join(dir, "node.log")
-	if st, err := os.Stat(path); err == nil && st.Size() > 10<<20 {
-		os.Rename(path, path+".1")
+// newLogger opens the node's leveled, age-pruned log (logs/node-YYYY-MM-DD.log under the data directory).
+// The level and retention are set from the manager's node settings once the config is applied.
+func newLogger(dir string) *nodelog.Logger {
+	adoptLegacyLogs(dir)
+	l := nodelog.New(filepath.Join(dir, "logs"), os.Stderr)
+	l.Prune()
+	return l
+}
+
+// adoptLegacyLogs moves the single-file logs of older node versions into the new log directory so
+// retention applies to them too.
+func adoptLegacyLogs(dir string) {
+	for old, name := range map[string]string{"node.log": "node-legacy.log", "node.log.1": "node-legacy-1.log"} {
+		if _, err := os.Stat(filepath.Join(dir, old)); err != nil {
+			continue
+		}
+		if os.MkdirAll(filepath.Join(dir, "logs"), 0o700) == nil {
+			os.Rename(filepath.Join(dir, old), filepath.Join(dir, "logs", name))
+		}
 	}
-	var w io.Writer = os.Stderr
-	if f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
-		w = io.MultiWriter(os.Stderr, f)
-	}
-	return log.New(w, "", log.LstdFlags)
 }
 
 func usage() {
@@ -141,25 +150,25 @@ func main() {
 		Arguments: []string{"--data-dir", dir, "run"},
 	})
 	if err != nil {
-		logger.Fatal(err)
+		fatal(logger, err)
 	}
 	switch cmd {
 	case "run":
 		if err := svc.Run(); err != nil {
-			logger.Fatal(err)
+			fatal(logger, err)
 		}
 	case "install", "uninstall", "start", "stop", "restart":
 		if cmd == "install" {
 			lockDownDataDir(dir, logger)
 		}
 		if err := service.Control(svc, cmd); err != nil {
-			logger.Fatalf("%s: %v", cmd, err)
+			fatal(logger, fmt.Errorf("%s: %w", cmd, err))
 		}
 		fmt.Printf("service %s: ok\n", cmd)
 	case "status":
 		st, err := svc.Status()
 		if err != nil {
-			logger.Fatal(err)
+			fatal(logger, err)
 		}
 		fmt.Println(map[service.Status]string{service.StatusRunning: "running", service.StatusStopped: "stopped", service.StatusUnknown: "unknown"}[st])
 	default:
@@ -194,13 +203,18 @@ func enroll(dir string, args []string) {
 
 // lockDownDataDir restricts the data directory (private keys, AP secrets) to administrators.
 // On Unix the files are already 0600 in a 0700 directory; on Windows ProgramData inherits broad read access.
-func lockDownDataDir(dir string, l *log.Logger) {
+func lockDownDataDir(dir string, l *nodelog.Logger) {
 	if runtime.GOOS != "windows" {
 		return
 	}
 	os.MkdirAll(dir, 0o700)
 	out, err := exec.Command("icacls", dir, "/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F").CombinedOutput()
 	if err != nil {
-		l.Printf("warning: could not restrict permissions on %s: %v: %s", dir, err, out)
+		l.Warnf("could not restrict permissions on %s: %v: %s", dir, err, out)
 	}
+}
+
+func fatal(l *nodelog.Logger, err error) {
+	l.Errorf("fatal: %v", err)
+	os.Exit(1)
 }

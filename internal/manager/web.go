@@ -516,6 +516,7 @@ func (a *App) maintenanceLoop(ctx context.Context) {
 			a.St.DB.Exec(ctx, `DELETE FROM audit WHERE ts < now() - interval '365 days'`)
 			a.St.DB.Exec(ctx, `DELETE FROM sessions WHERE expires_at < now()`)
 			a.renewInternalEAPCerts(ctx)
+			a.cleanupLogBundles(ctx)
 		})
 		a.refreshQUICCert(ctx)
 		select {

@@ -6,8 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"io"
-	"log"
 	"math/big"
 	"net"
 	"sync"
@@ -20,6 +18,7 @@ import (
 	"layeh.com/radius/rfc2869"
 
 	"radman/internal/eaptls"
+	"radman/internal/nodelog"
 	"radman/internal/pki"
 	"radman/internal/proto"
 )
@@ -76,7 +75,7 @@ func newEnv(t *testing.T, policy proto.Policy, mut func(*proto.PKI)) *env {
 		e.mu.Lock()
 		e.events = append(e.events, d)
 		e.mu.Unlock()
-	}, log.New(io.Discard, "", 0))
+	}, nodelog.Discard())
 	e.srv.SetRuntime(rt)
 	if err := e.srv.ListenAndServe(testListen, "127.0.0.1:0"); err != nil {
 		t.Fatal(err)

@@ -18,9 +18,10 @@ const (
 
 // Request is sent by a node on a fresh bidirectional stream.
 type Request struct {
-	Type    string      `json:"type"` // "enroll" | "checkin"
+	Type    string      `json:"type"` // "enroll" | "checkin" | "logs"
 	Enroll  *EnrollReq  `json:"enroll,omitempty"`
 	Checkin *CheckinReq `json:"checkin,omitempty"`
+	Logs    *LogUpload  `json:"logs,omitempty"`
 }
 
 type Response struct {
@@ -28,6 +29,22 @@ type Response struct {
 	Error   string       `json:"error,omitempty"`
 	Enroll  *EnrollResp  `json:"enroll,omitempty"`
 	Checkin *CheckinResp `json:"checkin,omitempty"`
+}
+
+// Log collection: the manager asks (CheckinResp.CollectLogs) and the node answers with "logs" requests,
+// one per chunk of a zip, each on its own stream. Chunks are idempotent, so a retry is harmless.
+const (
+	LogChunkBytes    = 2 << 20  // raw bytes per chunk
+	MaxLogBundleSize = 64 << 20 // largest accepted bundle (compressed)
+	FeatureLogs      = "logs"
+)
+
+type LogUpload struct {
+	ID    string `json:"id"`              // bundle id from CheckinResp.CollectLogs
+	Index int    `json:"index"`           // 0-based chunk number
+	Final bool   `json:"final,omitempty"` // last chunk; Index+1 chunks in total
+	Data  []byte `json:"data,omitempty"`
+	Error string `json:"error,omitempty"` // node could not build the bundle; no data follows
 }
 
 type EnrollReq struct {
@@ -58,7 +75,8 @@ type CheckinReq struct {
 type CheckinResp struct {
 	Config          *SiteConfig `json:"config,omitempty"` // present only if hash differs
 	ConfigHash      string      `json:"config_hash"`
-	Cert            string      `json:"cert,omitempty"` // renewed client cert
+	Cert            string      `json:"cert,omitempty"`         // renewed client cert
+	CollectLogs     string      `json:"collect_logs,omitempty"` // bundle id the node should build and upload
 	AckedSeq        uint64      `json:"acked_seq"`
 	IntervalSeconds int         `json:"interval_seconds"`
 	ServerTime      time.Time   `json:"server_time"`
@@ -69,6 +87,11 @@ type Stats struct {
 	Accepts       uint64 `json:"accepts"`
 	Rejects       uint64 `json:"rejects"`
 	QueueDepth    int    `json:"queue_depth"`
+
+	LogLevel         string   `json:"log_level,omitempty"`          // level the node is actually running at
+	LogRetentionDays int      `json:"log_retention_days,omitempty"` // age after which the node deletes log files
+	LogBytes         int64    `json:"log_bytes,omitempty"`          // log files currently on disk
+	Features         []string `json:"features,omitempty"`           // optional protocol features this node build supports
 }
 
 type CRLStatus struct {
@@ -99,6 +122,9 @@ type SiteConfig struct {
 	AuthPort        int    `json:"auth_port"`
 	AcctPort        int    `json:"acct_port"`
 	IntervalSeconds int    `json:"interval_seconds"`
+
+	LogLevel         string `json:"log_level,omitempty"`          // error | warning | info | debug (empty = info)
+	LogRetentionDays int    `json:"log_retention_days,omitempty"` // 0 = node default (30)
 }
 
 type AP struct {

@@ -129,6 +129,22 @@ certificate. Change or clear the names later on the node's page (the node picks 
 automatically with the same names. Devices must trust the tenant's EAP CA (*Server certificates → Download EAP CA*) and, if they validate the server name,
 the name configured on the device must be one of the names listed.
 
+## Node logging and log collection
+
+On a node's page (*Nodes → the node → Logging*, tenant administrators / operators) you can set:
+
+* **Log level** — `error`, `warning`, `info` (default) or `debug`. Info adds every authentication result and node activity; debug also logs
+  accepted-authentication and accounting detail. Secrets, keys and certificates' private parts are never logged.
+* **Log age (days)** — the node deletes log files older than this (1–365, default 30). Logs are one file per day under `logs/` in the node's
+  data directory, so the age has one-day granularity; a shorter age takes effect immediately when the node receives it.
+
+Both are sent to the node in its configuration and applied at its next check-in; the node keeps the last ones while offline, and the page shows
+what the node is actually running. **Collect logs** asks the node to zip its log files and upload them at its next check-in (within about a
+minute); a **Download .zip** link then appears on the page. Bundles are kept for 14 days (newest 5 per node), downloads and requests are audited,
+and a bundle is only accepted if it is a plain zip of node log files. Read-only users can see the settings and download collected bundles but not
+change anything. This needs the current node binary (older nodes show a hint to redeploy); the settings and log files of older nodes are adopted
+(`node.log` becomes `logs/node-legacy.log`) on upgrade.
+
 ## Roles (RBAC)
 
 | Role | Scope | Can do |

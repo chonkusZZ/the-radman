@@ -78,7 +78,7 @@ func (s *Server) listenRadSec(addr string) error {
 		return err
 	}
 	s.radsecLn = l
-	s.log.Printf("RadSec (RADIUS/TLS) listening on %s", addr)
+	s.log.Infof("RadSec (RADIUS/TLS) listening on %s", addr)
 	go func() {
 		for {
 			c, err := l.Accept()
@@ -95,7 +95,7 @@ func (s *Server) serveRadSec(c *tls.Conn) {
 	defer c.Close()
 	c.SetDeadline(time.Now().Add(15 * time.Second))
 	if err := c.Handshake(); err != nil {
-		s.log.Printf("RadSec handshake from %s failed: %v", c.RemoteAddr(), err)
+		s.log.Warnf("RadSec handshake from %s failed: %v", c.RemoteAddr(), err)
 		return
 	}
 	rt := s.rt.Load()
@@ -107,7 +107,7 @@ func (s *Server) serveRadSec(c *tls.Conn) {
 		s.radsecConns.Store(c, serial)
 		defer s.radsecConns.Delete(c)
 	}
-	s.log.Printf("RadSec connection from %s (%s)", c.RemoteAddr(), apName)
+	s.log.Infof("RadSec connection from %s (%s)", c.RemoteAddr(), apName)
 	w := &streamWriter{c: c}
 	ctx := context.WithValue(context.Background(), apNameKey, apName)
 	var wg sync.WaitGroup
@@ -129,7 +129,7 @@ func (s *Server) serveRadSec(c *tls.Conn) {
 		}
 		p, err := radius.Parse(buf, []byte(RadSecSecret))
 		if err != nil {
-			s.log.Printf("RadSec: bad packet from %s: %v", c.RemoteAddr(), err)
+			s.log.Warnf("RadSec: bad packet from %s: %v", c.RemoteAddr(), err)
 			return
 		}
 		req := (&radius.Request{LocalAddr: c.LocalAddr(), RemoteAddr: c.RemoteAddr(), Packet: p}).WithContext(ctx)

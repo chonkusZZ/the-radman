@@ -9,7 +9,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"sync"
@@ -25,6 +24,7 @@ import (
 
 	"radman/internal/crl"
 	"radman/internal/eaptls"
+	"radman/internal/nodelog"
 	"radman/internal/pki"
 )
 
@@ -56,11 +56,11 @@ type Server struct {
 	radsecLn    net.Listener
 	radsecConns sync.Map // net.Conn -> certificate serial
 	stop        chan struct{}
-	log         *log.Logger
+	log         *nodelog.Logger
 	AuthAddr    net.Addr
 }
 
-func NewServer(sink EventSink, l *log.Logger) *Server {
+func NewServer(sink EventSink, l *nodelog.Logger) *Server {
 	return &Server{sink: sink, stop: make(chan struct{}), log: l}
 }
 
@@ -90,7 +90,7 @@ func (ss secretSource) RADIUSSecret(ctx context.Context, a net.Addr) ([]byte, er
 	if ap := rt.LookupAP(udp.IP); ap != nil {
 		return ap.secret, nil
 	}
-	ss.s.log.Printf("dropping packet from unknown AP %s", udp.IP)
+	ss.s.log.Warnf("dropping packet from unknown AP %s", udp.IP)
 	return nil, nil
 }
 
@@ -111,13 +111,13 @@ func (s *Server) ListenAndServeRadSec(authAddr, acctAddr, radsecAddr string) err
 		return err
 	}
 	s.AuthAddr = authConn.LocalAddr()
-	auth := &radius.PacketServer{SecretSource: secretSource{s}, Handler: radius.HandlerFunc(s.handleAuth), ErrorLog: s.log}
-	acct := &radius.PacketServer{SecretSource: secretSource{s}, Handler: radius.HandlerFunc(s.handleAcct), ErrorLog: s.log}
+	auth := &radius.PacketServer{SecretSource: secretSource{s}, Handler: radius.HandlerFunc(s.handleAuth), ErrorLog: s.log.Std()}
+	acct := &radius.PacketServer{SecretSource: secretSource{s}, Handler: radius.HandlerFunc(s.handleAcct), ErrorLog: s.log.Std()}
 	s.servers = []*radius.PacketServer{auth, acct}
 	go auth.Serve(authConn)
 	go acct.Serve(acctConn)
 	go s.reaper()
-	s.log.Printf("RADIUS listening: auth %s, acct %s", authAddr, acctAddr)
+	s.log.Infof("RADIUS listening: auth %s, acct %s", authAddr, acctAddr)
 	if radsecAddr != "" {
 		if err := s.listenRadSec(radsecAddr); err != nil {
 			s.Shutdown()
@@ -257,7 +257,7 @@ func (s *Server) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 		return
 	}
 	if !verifyMA(p, secret) {
-		s.log.Printf("bad Message-Authenticator from %s", r.RemoteAddr)
+		s.log.Warnf("bad Message-Authenticator from %s", r.RemoteAddr)
 		return
 	}
 	apName, _ := r.Context().Value(apNameKey).(string)
@@ -385,6 +385,11 @@ func (s *Server) record(as *authSession, p *radius.Packet, result, reason string
 		d["issuer"] = as.leaf.Issuer.CommonName
 		d["san"] = strings.Join(crl.SANs(as.leaf), ",")
 	}
+	if result == "accept" {
+		s.log.Debugf("auth accept: ap=%q mac=%s identity=%q rule=%q vlan=%q (%sms)", d["ap"], d["client_mac"], d["identity"], d["rule"], d["vlan"], d["duration_ms"])
+	} else {
+		s.log.Infof("auth %s: ap=%q mac=%s identity=%q reason=%q", result, d["ap"], d["client_mac"], d["identity"], reason)
+	}
 	s.sink("auth", d)
 }
 
@@ -414,6 +419,7 @@ func (s *Server) handleAcct(w radius.ResponseWriter, r *radius.Request) {
 			d["ap"] = ap.name
 		}
 	}
+	s.log.Debugf("accounting %s: ap=%q mac=%s session=%s", d["status"], d["ap"], d["client_mac"], d["session_id"])
 	s.sink("acct", d)
 	w.Write(p.Response(radius.CodeAccountingResponse))
 }
