@@ -325,3 +325,44 @@ func (e *env) issuePEM(t *testing.T, cn string) (certPEM, keyPEM []byte) {
 	keyPEM, _ = pki.EncodeKey(k)
 	return append(certPEM, e.caPEM...), keyPEM
 }
+
+// Azure Cloud PKI shape: root + issuing CA in the profile, a CRL for the issuing CA only, fail-closed.
+func TestAzureCloudPKIEndToEnd(t *testing.T) {
+	rc, rk, _ := pki.NewRootCA("Cloud PKI Root", 24*time.Hour)
+	root, _ := pki.LoadCA(rc, rk)
+	ic, ik, _ := pki.NewIntermediate(root, "Cloud PKI Issuing CA", 12*time.Hour)
+	issuing, _ := pki.LoadCA(ic, ik)
+
+	var e *env
+	e = newEnv(t, proto.Policy{DefaultAction: "allow"}, func(p *proto.PKI) {
+		p.CAs = string(rc) + string(ic)
+		p.StalePolicy = "fail_closed"
+		p.CRLURLs = []string{"http://crl.test/issuing.crl"}
+		p.CRLs = map[string][]byte{}
+	})
+	good, _ := e.clientCert(t, issuing, "managed-laptop")
+	bad, badLeaf := e.clientCert(t, issuing, "stolen-laptop")
+	der, err := x509.CreateRevocationList(rand.Reader, &x509.RevocationList{
+		Number: big.NewInt(1), ThisUpdate: time.Now().Add(-time.Hour), NextUpdate: time.Now().Add(24 * time.Hour),
+		RevokedCertificateEntries: []x509.RevocationListEntry{{SerialNumber: badLeaf.SerialNumber, RevocationTime: time.Now().Add(-time.Minute)}},
+	}, issuing.Cert, issuing.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := *e.srv.Runtime().Cfg
+	p := cfg.PKI[0]
+	p.CRLs = map[string][]byte{"http://crl.test/issuing.crl": der}
+	cfg.PKI = []proto.PKI{p}
+	rt, err := BuildRuntime(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.srv.SetRuntime(rt)
+
+	if r, _ := e.authenticate(t, e.tlsClient(good, tls.VersionTLS13)); r.Code != radius.CodeAccessAccept {
+		t.Fatalf("a valid Cloud PKI client must be accepted in fail-closed mode (the root has no CRL): %v", r.Code)
+	}
+	if r, _ := e.authenticate(t, e.tlsClient(bad, tls.VersionTLS13)); r.Code != radius.CodeAccessReject {
+		t.Fatalf("a client revoked by the issuing CA's CRL must be rejected: %v", r.Code)
+	}
+}

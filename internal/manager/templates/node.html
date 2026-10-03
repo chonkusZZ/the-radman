@@ -9,12 +9,12 @@ radman-node install &amp;&amp; radman-node start</pre>
 {{else if eq .N.Status "pending"}}<div class="card"><p>The enrollment token has expired.</p>
 {{if .CanWrite}}<form method="post" action="/nodes/{{.N.ID}}/regen"><input type="hidden" name="csrf" value="{{.CSRF}}"><button type="submit">Generate new token</button></form>{{end}}</div>{{end}}
 {{if ne .N.Status "pending"}}<div class="card"><h2>Status</h2><table>
-<tr><th>Last check-in</th><td>{{fmtTime .N.LastSeen}} ({{ago .N.LastSeen}}) from {{.N.Addr}}</td></tr>
+<tr><th>Last check-in</th><td class="nowrap">{{fmtTime .N.LastSeen}} ({{ago .N.LastSeen}}) from {{.N.Addr}}</td></tr>
 <tr><th>Host</th><td>{{.N.Host}} · {{.N.OS}} · v{{.N.Version}}</td></tr>
 <tr><th>Client certificate</th><td>expires {{fmtTime .N.CertNotAfter}} — renewed automatically 30 days before expiry</td></tr>
 <tr><th>Site config</th><td>{{if .N.InSync}}<span class="badge ok">node runs the current config</span>{{else}}<span class="badge warn">node has not applied the latest config yet</span>{{end}}</td></tr>
 <tr><th>Queued events</th><td>{{.N.QueueDepth}}</td></tr></table></div>
-{{if .CRLs}}<div class="card"><h2>CRLs on this node</h2><table><tr><th>URL</th><th>Next update</th><th>Source</th></tr>{{range .CRLs}}<tr><td class="mono">{{.URL}}</td><td>{{fmtTime .NextUpdate}}</td><td>{{.Source}}</td></tr>{{end}}</table></div>{{end}}{{end}}
+{{if .CRLs}}<div class="card"><h2>CRLs on this node</h2><table><tr><th>URL</th><th>Next update</th><th>Source</th></tr>{{range .CRLs}}<tr><td class="mono">{{.URL}}</td><td class="nowrap">{{fmtTime .NextUpdate}}</td><td>{{.Source}}</td></tr>{{end}}</table></div>{{end}}{{end}}
 <div class="card"><h2>RADIUS server certificate</h2>
 {{if .Names}}<p>This node presents its own certificate for: {{range $i, $x := .Names}}{{if $i}}, {{end}}<code>{{$x}}</code>{{end}}<br><span class="help">CN = <code>{{index .Names 0}}</code>; all names are subject alternative names · expires {{fmtTime .NamesExpire}} (renewed automatically)</span></p>
 {{else}}<p>This node uses the <b>site's</b> server certificate.</p>{{end}}

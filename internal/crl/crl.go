@@ -143,29 +143,38 @@ func (s *PKIState) Verify(leaf *x509.Certificate, presented []*x509.Certificate,
 	return nil, lastErr
 }
 
+// crlFor returns the newest loaded CRL that was signed by issuer. Matching is by signature, not by comparing the
+// issuer name bytes: CAs differ in how they encode the same distinguished name (PrintableString vs UTF8String), and a
+// byte comparison would then miss a perfectly good CRL.
+func (s *PKIState) crlFor(issuer *x509.Certificate) *entry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var found *entry
+	for _, e := range s.crls {
+		if e.rl.CheckSignatureFrom(issuer) == nil && (found == nil || e.rl.ThisUpdate.After(found.rl.ThisUpdate)) {
+			found = e
+		}
+	}
+	return found
+}
+
+// checkRevocation walks a verified chain [leaf, intermediate..., root].
+//
+//   - The leaf is always checked, against the CRL of the CA that issued it. If revocation is configured for the profile
+//     (CRL URLs set) and no CRL from that CA is available, the fail-closed / fail-open policy decides.
+//   - CA certificates higher up are checked only when their own issuer publishes a CRL. Many PKIs have none - Microsoft
+//     Azure Cloud PKI publishes a CRL for the issuing CA but not for the root - and demanding one would reject every client.
+//     If such a CRL is present it is honoured: a revoked intermediate invalidates everything below it.
 func (s *PKIState) checkRevocation(chain []*x509.Certificate, now time.Time) error {
-	// every non-root cert in the chain is checked against the CRL of its issuer
+	if len(s.Cfg.CRLURLs) == 0 && s.noCRLs() {
+		return nil // revocation is not configured for this profile
+	}
 	for i := 0; i < len(chain)-1; i++ {
 		cert, issuer := chain[i], chain[i+1]
-		s.mu.RLock()
-		var found *entry
-		for _, e := range s.crls {
-			if string(e.rl.RawIssuer) == string(issuer.RawSubject) && e.rl.CheckSignatureFrom(issuer) == nil {
-				if found == nil || e.rl.ThisUpdate.After(found.rl.ThisUpdate) {
-					found = e
-				}
-			}
-		}
-		s.mu.RUnlock()
+		found := s.crlFor(issuer)
 		if found == nil {
-			if len(s.Cfg.CRLURLs) == 0 && i > 0 {
-				continue // no CRL configured at all for intermediates
-			}
-			if len(s.Cfg.CRLURLs) == 0 {
-				continue
-			}
-			if s.Cfg.StalePolicy == "fail_open" {
-				continue
+			if i > 0 || s.Cfg.StalePolicy == "fail_open" {
+				continue // no CRL from this CA: nothing to check for a CA certificate; fail-open lets the leaf through
 			}
 			return fmt.Errorf("no CRL available for issuer %q (fail-closed)", issuer.Subject.CommonName)
 		}
@@ -176,11 +185,17 @@ func (s *PKIState) checkRevocation(chain []*x509.Certificate, now time.Time) err
 		}
 		for _, r := range found.rl.RevokedCertificateEntries {
 			if r.SerialNumber.Cmp(cert.SerialNumber) == 0 && !r.RevocationTime.After(now) {
-				return fmt.Errorf("certificate serial %s revoked at %s", pki.SerialHex(cert), r.RevocationTime.Format(time.RFC3339))
+				return fmt.Errorf("certificate serial %s (%s) revoked at %s", pki.SerialHex(cert), cert.Subject.CommonName, r.RevocationTime.Format(time.RFC3339))
 			}
 		}
 	}
 	return nil
+}
+
+func (s *PKIState) noCRLs() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.crls) == 0
 }
 
 // Decision is the outcome of evaluating policy for a verified certificate.

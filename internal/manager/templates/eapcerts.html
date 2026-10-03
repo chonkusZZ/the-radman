@@ -2,7 +2,7 @@
 <div class="card"><h2>Internal EAP CA</h2><p>Certificates issued here are signed by the internal EAP CA. Distribute this CA certificate to your devices (e.g. as a trusted root via Intune) so they trust the RADIUS server.</p>
 <p class="mono">SHA-256: {{.CAFP}}</p><a class="btn sec" href="/eapcerts/ca.pem">Download EAP CA certificate</a></div>
 <div class="card"><table><tr><th>Name</th><th>Source</th><th>Names</th><th>Expires</th><th>Used by</th><th></th></tr>
-{{range .Certs}}<tr><td>{{.Name}}</td><td><span class="badge">{{.Source}}</span></td><td>{{join .DNS ", "}}</td><td>{{fmtTime .NotAfter}}</td><td>{{join .Sites ", "}}</td>
+{{range .Certs}}<tr><td>{{.Name}}</td><td><span class="badge">{{.Source}}</span></td><td>{{join .DNS ", "}}</td><td class="nowrap">{{fmtTime .NotAfter}}</td><td>{{join .Sites ", "}}</td>
 <td>{{if and $.CanWrite (not .Sites)}}<form method="post" action="/eapcerts/{{.ID}}/delete" data-confirm="Delete this certificate?"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="danger sm">Delete</button></form>{{end}}</td></tr>{{end}}</table>
 <p class="help">Internal certificates renew automatically 60 days before expiry. Uploaded certificates must be replaced manually.</p></div>
 {{if .CanWrite}}<div class="split"><div class="card"><h2>Issue from internal CA</h2><form method="post" action="/eapcerts/internal"><input type="hidden" name="csrf" value="{{.CSRF}}">

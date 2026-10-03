@@ -11,7 +11,7 @@
 <label>Internal notes</label><textarea name="notes">{{.Notes}}</textarea>
 {{if .IsGlobalAdmin}}<div class="actions"><button type="submit">Save</button></div></form>{{end}}</div>
 <div class="card"><h2>Users with access</h2>{{if .Members}}<table><tr><th>User</th><th>Role</th><th>Via</th><th>Last sign-in</th><th></th></tr>
-{{range .Members}}<tr><td>{{.Email}}<div class="help">{{.Name}}</div></td><td>{{if eq .Role "tenant_admin"}}Tenant administrator{{else}}Read-only{{end}}</td><td>{{.Source}}</td><td>{{fmtTime .LastLogin}}</td>
+{{range .Members}}<tr><td>{{.Email}}<div class="help">{{.Name}}</div></td><td>{{if eq .Role "tenant_admin"}}Tenant administrator{{else}}Read-only{{end}}</td><td>{{.Source}}</td><td class="nowrap">{{fmtTime .LastLogin}}</td>
 <td>{{if $.IsGlobalAdmin}}<form method="post" action="/platform/tenants/{{$.T.ID}}/members/remove" data-confirm="Remove this user's access?"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="user" value="{{.UserID}}"><button class="danger sm">Remove</button></form>{{end}}</td></tr>{{end}}</table>
 {{else}}<p class="empty">Nobody has access yet.</p>{{end}}
 <p class="help">Global administrators and global read-only users can always see every tenant and are not listed here.</p>

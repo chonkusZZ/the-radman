@@ -19,7 +19,7 @@ type pkiRow struct {
 }
 
 type crlRow struct {
-	URL, Err            string
+	URL, Err, SignedBy  string
 	Fetched, NextUpdate *time.Time
 	Revoked             int
 	Stale               bool
@@ -143,22 +143,32 @@ func (s *server) pkiDetail(w http.ResponseWriter, r *http.Request, u *User) {
 		return
 	}
 	type caRow struct {
-		Subject, Issuer, Serial, FP string
-		NotAfter                    time.Time
-		Root                        bool
+		Subject, Issuer, Serial, FP, CRL string
+		NotAfter                         time.Time
+		Root                             bool
 	}
-	var cas []caRow
-	if cs, err := pki.ParseCerts([]byte(pem)); err == nil {
-		for _, c := range cs {
-			cas = append(cas, caRow{c.Subject.CommonName, c.Issuer.CommonName, pki.SerialHex(c), pki.Fingerprint(c), c.NotAfter, string(c.RawSubject) == string(c.RawIssuer)})
-		}
-	}
+	cs, _ := pki.ParseCerts([]byte(pem))
 	var crls []crlRow
+	signs := map[string]string{} // CA fingerprint -> URL of the CRL it signed
 	for _, url := range x.URLs {
 		c := crlRow{URL: url}
-		s.a.St.DB.QueryRow(ctx, `SELECT fetched_at, next_update, revoked_count, last_error FROM crl_cache WHERE url=$1`, url).Scan(&c.Fetched, &c.NextUpdate, &c.Revoked, &c.Err)
+		var der []byte
+		s.a.St.DB.QueryRow(ctx, `SELECT fetched_at, next_update, revoked_count, last_error, der FROM crl_cache WHERE url=$1`, url).Scan(&c.Fetched, &c.NextUpdate, &c.Revoked, &c.Err, &der)
 		c.Stale = c.NextUpdate != nil && time.Now().After(*c.NextUpdate)
+		if rl, err := crl.Parse(der); err == nil && len(der) > 0 {
+			c.SignedBy = "no CA in this profile (check the CA certificates)"
+			for _, ca := range cs {
+				if rl.CheckSignatureFrom(ca) == nil {
+					c.SignedBy = ca.Subject.CommonName
+					signs[pki.Fingerprint(ca)] = url
+				}
+			}
+		}
 		crls = append(crls, c)
+	}
+	var cas []caRow
+	for _, c := range cs {
+		cas = append(cas, caRow{c.Subject.CommonName, c.Issuer.CommonName, pki.SerialHex(c), pki.Fingerprint(c), signs[pki.Fingerprint(c)], c.NotAfter, string(c.RawSubject) == string(c.RawIssuer)})
 	}
 	var sites []string
 	rows, _ := s.a.St.DB.Query(ctx, `SELECT s.name FROM sites s JOIN site_pki sp ON sp.site_id=s.id WHERE sp.pki_id=$1::uuid AND s.tenant_id=$2::uuid ORDER BY s.name`, id, u.Tenant.ID)

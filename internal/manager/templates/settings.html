@@ -62,7 +62,7 @@
 <div class="stat"><span>Last good backup</span><b>{{if .LastGood}}{{ago .LastGood.Finished}}{{else}}never{{end}}</b></div></div>
 {{range .Errors}}<div class="flash err">{{.}}</div>{{end}}
 <div class="card"><h2>Backups</h2>
-{{if .Backups}}<table><tr><th>Started</th><th>Kind</th><th>Result</th><th>Size</th><th>Detail</th></tr>{{range .Backups}}<tr><td>{{fmtTime .Started}}</td><td>{{.Kind}}</td><td><span class="badge {{if eq .Status "ok"}}ok{{else if eq .Status "failed"}}bad{{else}}warn{{end}}">{{.Status}}</span></td><td>{{if .Size}}{{bytes .Size}}{{end}}</td><td class="mono">{{.Detail}}</td></tr>{{end}}</table>
+{{if .Backups}}<table><tr><th>Started</th><th>Kind</th><th>Result</th><th>Size</th><th>Detail</th></tr>{{range .Backups}}<tr><td class="nowrap">{{fmtTime .Started}}</td><td>{{.Kind}}</td><td><span class="badge {{if eq .Status "ok"}}ok{{else if eq .Status "failed"}}bad{{else}}warn{{end}}">{{.Status}}</span></td><td>{{if .Size}}{{bytes .Size}}{{end}}</td><td class="mono">{{.Detail}}</td></tr>{{end}}</table>
 {{else}}<p class="empty">No backup has reported in. Backups are performed by the database container (see <code>deploy/</code> and the README): continuous WAL archiving plus scheduled full/differential backups with point-in-time recovery.</p>{{end}}</div>
 <div class="card"><h2>WAL archiving (point-in-time recovery)</h2>
 <p>Archive mode: <span class="badge {{if eq .ArchiveMode "off"}}bad{{else}}ok{{end}}">{{.ArchiveMode}}</span> · archived segments: {{.Archiver.Archived}} · failures: <span class="badge {{if .Archiver.Failed}}warn{{else}}ok{{end}}">{{.Archiver.Failed}}</span></p>

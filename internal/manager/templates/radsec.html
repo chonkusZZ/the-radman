@@ -27,7 +27,7 @@
 <script src="/static/radsec.js" defer></script>{{end}}
 
 <div class="card"><h2>Issued certificates</h2>{{if .Certs}}<table><tr><th>Serial</th><th>Key</th><th>Issued</th><th>Expires</th><th>By</th><th>Status</th><th></th></tr>
-{{range .Certs}}<tr><td class="mono">{{.Serial}}</td><td>{{.Algo}}</td><td>{{fmtTime .Created}}</td><td>{{fmtTime .NotAfter}}</td><td>{{.CreatedBy}}</td>
+{{range .Certs}}<tr><td class="mono">{{.Serial}}</td><td>{{.Algo}}</td><td class="nowrap">{{fmtTime .Created}}</td><td class="nowrap">{{fmtTime .NotAfter}}</td><td>{{.CreatedBy}}</td>
 <td>{{if .Revoked}}<span class="badge bad">revoked</span>{{else if .Expired}}<span class="badge bad">expired</span>{{else}}<span class="badge ok">active</span>{{end}}</td>
 <td>{{if and (not .Revoked) (not .Expired) ($.CanWrite)}}<form method="post" action="/radsec/{{.ID}}/revoke" data-confirm="Revoke this certificate? The AP will be disconnected."><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="danger sm">Revoke</button></form>{{end}}</td></tr>{{end}}</table>
 {{else}}<p class="empty">None yet.</p>{{end}}</div>{{end}}{{end}}

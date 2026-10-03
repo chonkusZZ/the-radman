@@ -1,6 +1,6 @@
 {{define "content"}}<h1>Users</h1><p class="sub">People who can sign in to <b>{{.Tenant.Name}}</b>.</p>
 <div class="card">{{if .Members}}<table><tr><th>User</th><th>Role</th><th>Last sign-in</th><th></th></tr>
-{{range .Members}}<tr><td>{{.Email}}<div class="help">{{.Name}}{{if eq .Source "sso"}} · via single sign-on{{end}}</div></td><td>{{if eq .Role "tenant_admin"}}Administrator{{else}}Read-only{{end}}</td><td>{{fmtTime .LastLogin}}</td>
+{{range .Members}}<tr><td>{{.Email}}<div class="help">{{.Name}}{{if eq .Source "sso"}} · via single sign-on{{end}}</div></td><td>{{if eq .Role "tenant_admin"}}Administrator{{else}}Read-only{{end}}</td><td class="nowrap">{{fmtTime .LastLogin}}</td>
 <td>{{if ne .UserID $.User.ID}}<details><summary>edit</summary><form method="post" action="/users/update"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="user" value="{{.UserID}}">
 <label>Role</label><select name="role"><option value="tenant_admin" {{if eq .Role "tenant_admin"}}selected{{end}}>Administrator</option><option value="read_only" {{if eq .Role "read_only"}}selected{{end}}>Read-only</option></select><div class="actions"><button class="sm" type="submit">Save</button></div></form>
 <form method="post" action="/users/update" data-confirm="Remove this user's access?"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="user" value="{{.UserID}}"><button class="danger sm" name="remove" value="1">Remove access</button></form></details>{{end}}</td></tr>{{end}}</table>

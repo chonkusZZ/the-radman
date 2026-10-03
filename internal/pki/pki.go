@@ -62,6 +62,53 @@ func NewCA(commonName string, validity time.Duration) (certPEM, keyPEM []byte, e
 	return EncodeCert(der), keyPEM, err
 }
 
+// NewRootCA creates a self-signed root that may have subordinate CAs below it (NewCA's CAs may not).
+func NewRootCA(commonName string, validity time.Duration) (certPEM, keyPEM []byte, err error) {
+	key, err := GenerateKey()
+	if err != nil {
+		return nil, nil, err
+	}
+	tpl := &x509.Certificate{
+		SerialNumber:          serial(),
+		Subject:               pkix.Name{CommonName: commonName, Organization: []string{"RadMAN"}},
+		NotBefore:             time.Now().Add(-5 * time.Minute),
+		NotAfter:              time.Now().Add(validity),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tpl, tpl, &key.PublicKey, key)
+	if err != nil {
+		return nil, nil, err
+	}
+	keyPEM, err = EncodeKey(key)
+	return EncodeCert(der), keyPEM, err
+}
+
+// NewIntermediate creates a subordinate (issuing) CA signed by parent. Returns PEM cert and PEM key.
+func NewIntermediate(parent *CA, commonName string, validity time.Duration) (certPEM, keyPEM []byte, err error) {
+	key, err := GenerateKey()
+	if err != nil {
+		return nil, nil, err
+	}
+	tpl := &x509.Certificate{
+		SerialNumber:          serial(),
+		Subject:               pkix.Name{CommonName: commonName, Organization: []string{"RadMAN"}},
+		NotBefore:             time.Now().Add(-5 * time.Minute),
+		NotAfter:              time.Now().Add(validity),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		MaxPathLenZero:        true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tpl, parent.Cert, &key.PublicKey, parent.Key)
+	if err != nil {
+		return nil, nil, err
+	}
+	keyPEM, err = EncodeKey(key)
+	return EncodeCert(der), keyPEM, err
+}
+
 func LoadCA(certPEM, keyPEM []byte) (*CA, error) {
 	c, err := ParseCert(certPEM)
 	if err != nil {

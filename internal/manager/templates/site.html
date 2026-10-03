@@ -1,7 +1,7 @@
 {{define "content"}}<h1>{{.Name}}</h1><p class="sub">{{.Description}}</p>
 <div class="card"><h2>Nodes</h2>
 {{if .Nodes}}<table><tr><th>Name</th><th>Status</th><th>Last check-in</th><th>Config</th><th>Version</th></tr>
-{{range .Nodes}}<tr><td><a href="/nodes/{{.ID}}">{{.Name}}</a></td><td>{{template "nodebadge" .}}</td><td>{{ago .LastSeen}}</td><td>{{if .InSync}}<span class="badge ok">in sync</span>{{else if eq .Status "active"}}<span class="badge warn">pending sync</span>{{end}}</td><td>{{.Version}} {{.OS}}</td></tr>{{end}}</table>
+{{range .Nodes}}<tr><td><a href="/nodes/{{.ID}}">{{.Name}}</a></td><td>{{template "nodebadge" .}}</td><td class="nowrap">{{ago .LastSeen}}</td><td>{{if .InSync}}<span class="badge ok">in sync</span>{{else if eq .Status "active"}}<span class="badge warn">pending sync</span>{{end}}</td><td>{{.Version}} {{.OS}}</td></tr>{{end}}</table>
 {{else}}<p class="empty">No node yet. Create one, then download and run the package on a server at the site.</p>{{end}}
 {{if .CanWrite}}<form method="post" action="/sites/{{.ID}}/nodes" class="nodeform"><input type="hidden" name="csrf" value="{{.CSRF}}">
 <div class="row"><div><label>Node name</label><input type="text" name="name" placeholder="e.g. {{.Name}}-node1" required></div>
