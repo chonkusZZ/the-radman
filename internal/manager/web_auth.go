@@ -233,7 +233,7 @@ func (s *server) totpEnable(w http.ResponseWriter, r *http.Request, u *User) {
 			return
 		}
 	}
-	key, err := totp.Generate(totp.GenerateOpts{Issuer: "arc's The RadMAN", AccountName: u.Email})
+	key, err := totp.Generate(totp.GenerateOpts{Issuer: "The RadMAN", AccountName: u.Email})
 	if enc != "" && code != "" { // wrong code: keep the same secret so the QR already scanned still works
 		sec, _ := s.a.open(enc)
 		key, err = otpFromSecret(u.Email, sec)

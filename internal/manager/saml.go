@@ -130,7 +130,7 @@ func (a *App) samlBase(ctx context.Context, p *ssoProv) (*saml.ServiceProvider, 
 	cp, kp, _ := a.getPEM(ctx, p.spName)
 	if cp == nil {
 		var err error
-		if cp, kp, err = pki.SelfSignedRSA("arc's The RadMAN SAML SP", 10*365*24*time.Hour); err != nil {
+		if cp, kp, err = pki.SelfSignedRSA("The RadMAN SAML SP", 10*365*24*time.Hour); err != nil {
 			return nil, err
 		}
 		if err := a.putPEM(ctx, p.spName, cp, kp); err != nil {
@@ -386,7 +386,7 @@ func (a *App) ssoLoginPlatform(ctx context.Context, cfg SAML, attrs map[string][
 		}
 	}
 	if platform == "" && len(grants) == 0 {
-		return "", "", errors.New("your account is not in a group that is allowed to use arc's The RadMAN")
+		return "", "", errors.New("your account is not in a group that is allowed to use The RadMAN")
 	}
 	// the account must belong to the platform IdP (or be new); a local or customer-IdP account with this e-mail is never taken over
 	err = a.St.DB.QueryRow(ctx, `INSERT INTO users(email,name,platform_role,sso,idp) VALUES($1,$2,$3,true,'platform')

@@ -137,7 +137,7 @@ func main() {
 	logger := newLogger(dir)
 	prg := &program{dir: dir, log: logger}
 	svc, err := service.New(prg, &service.Config{
-		Name: svcName, DisplayName: "arc's The RadMAN Site Node", Description: "RADIUS EAP-TLS authentication node managed by arc's The RadMAN",
+		Name: svcName, DisplayName: "The RadMAN Site Node", Description: "RADIUS EAP-TLS authentication node managed by The RadMAN",
 		Arguments: []string{"--data-dir", dir, "run"},
 	})
 	if err != nil {

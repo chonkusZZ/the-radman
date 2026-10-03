@@ -1,6 +1,6 @@
 {{define "base"}}<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{{if .Title}}{{.Title}} · {{end}}arc's The RadMAN</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
+<title>{{if .Title}}{{.Title}} · {{end}}The RadMAN</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
 <body>{{if .User}}
 <div class="shell"><aside class="side"><div class="brand">{{template "brand" .}}</div>
 <nav>
@@ -52,4 +52,4 @@
 <div class="row"><div><label>If the CRL is missing or out of date</label><select name="stale_policy"><option value="fail_closed" {{if ne .P.StalePolicy "fail_open"}}selected{{end}}>Reject authentications (fail closed, recommended)</option><option value="fail_open" {{if eq .P.StalePolicy "fail_open"}}selected{{end}}>Keep accepting (fail open)</option></select></div>
 <div><label>Grace period after CRL expiry (hours)</label><input type="number" name="stale_grace_hours" value="{{if .Grace}}{{.Grace}}{{else}}24{{end}}"></div></div>
 <div class="actions"><button type="submit">Save profile</button></div></form>{{end}}
-{{define "brand"}}{{if .Logo}}<img class="logo" src="/branding/logo.svg?v={{.LogoVer}}" alt="">{{end}}<span class="brandname">arc's The Rad<em>MAN</em></span>{{end}}
+{{define "brand"}}{{if .Logo}}<img class="logo" src="/branding/logo.svg?v={{.LogoVer}}" alt="">{{end}}<span class="brandname">The Rad<em>MAN</em></span>{{end}}

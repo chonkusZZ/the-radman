@@ -1,4 +1,4 @@
-# arc's The RadMAN (multi-tenant) - production-style stack.
+# The RadMAN (multi-tenant) - production-style stack.
 #
 #   cp .env.example .env   # set the passwords, then:
 #   docker compose up -d

@@ -730,7 +730,7 @@ func (s *server) nodeDownload(w http.ResponseWriter, r *http.Request, u *User) {
 	w.Write(buf.Bytes())
 }
 
-const readme = `arc's The RadMAN site node: %s
+const readme = `The RadMAN site node: %s
 
 This package contains the node program and a single-use enrollment file (enroll.json).
 Keep them together; enroll.json is consumed on first start.

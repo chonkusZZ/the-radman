@@ -1,4 +1,4 @@
-# arc's The Rad*MAN* — multi-tenant (MSP) edition
+# The Rad<i style="color:#14f2af">MAN</i> — multi-tenant (MSP) edition
 
 Hosted, multi-tenant RADIUS management for Wi-Fi access points. **EAP-TLS** certificate authentication, **RadSEC** for APs,
 Azure Cloud PKI / any CA + CRL, SAML SSO, and per-customer isolation. One platform, many customers ("tenants"), each with
@@ -14,6 +14,65 @@ their own sites, access points, nodes, PKI, certificates, logs and users.
                          │   └─ streaming standby (read replica)  backups    │  RADIUS/EAP-TLS · RadSEC     │
                          └────────────────────────────────────────┘          └──────────────────────────────┘
 ```
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Sign in](docs/screenshots/login.jpg) Sign in — local password or your organisation's SSO | ![Platform](docs/screenshots/platform.jpg) Platform view — tenants, global stats, global admin nav |
+| ![Sites](docs/screenshots/sites.jpg) Sites — access points and nodes per site | ![Site detail](docs/screenshots/site-detail.jpg) Site detail — nodes, enrollment, server certificate names |
+| ![PKI profiles](docs/screenshots/pki.jpg) PKI profiles — trust anchors and CRL sources (incl. Azure Cloud PKI) | ![Stats](docs/screenshots/stats.jpg) Stats — accepted/rejected authentications, clients, reports |
+
+## Getting started
+
+The fastest path is Docker Compose; it brings up Postgres and the manager together.
+
+**1. Prerequisites** — Docker and Docker Compose. Nothing else: site nodes are downloaded as a single binary straight from
+the web UI once the manager is running.
+
+**2. Clone and configure**
+```bash
+git clone git@github.com:chonkusZZ/the-radman.git && cd the-radman
+cp .env.example .env            # set RADMAN_DB_PASSWORD and BACKUP_PASSPHRASE to your own values
+```
+
+**3. Start it**
+```bash
+docker compose up -d
+docker compose logs manager | grep "setup token"
+```
+
+**4. Create the first administrator** — open `https://<this host>/` in a browser, paste in the one-time setup token
+from the log line above, and set an e-mail/password. You're now signed in as a **global administrator**.
+
+**5. Create a tenant and a site** — *Platform → Tenants → New tenant* (skip this in standalone mode — one tenant called
+*Default* already exists). Open the tenant, then *Sites → New site* to represent a building or campus.
+
+**6. Add a PKI profile** — *PKI profiles → Add PKI profile*: paste your CA certificate(s) (root + issuing, for Azure Cloud
+PKI) and, if you want fail-closed revocation checking, a CRL URL for each CA that publishes one. Attach the profile to
+the site.
+
+**7. Download and enroll a node** — on the site page, *Add node*, then download the binary for the site's machine and
+run:
+```bash
+./radman-node install && radman-node start
+```
+It reads the enrollment token baked into the download, authenticates to the manager over the single QUIC/UDP port, and
+starts serving EAP-TLS RADIUS immediately — no further configuration needed.
+
+**8. Point your access points at the node's IP**, RADIUS port 1812 (or whatever you configured), using the shared secret
+shown on the site page. Devices that authenticate with a certificate issued by (or chaining to) the PKI profile's CA
+are accepted; everyone else is rejected and shows up under *Stats → Overview*.
+
+Ports to open: **443/tcp** (UI), 80/tcp (optional HTTP→HTTPS redirect), **7843/udp** (all site nodes, one port for
+every node everywhere).
+
+### Upgrading from the single-tenant version
+Just start the new manager against the existing database. On first start it **migrates in place** (idempotent): existing data moves
+into a tenant called **Default**; old *admin* users become **global administrators**, *operators* become tenant administrators and
+*viewers* read-only members of Default; the old EAP/RadSec CAs become Default's CAs (already-issued certificates keep working);
+the events table is converted to monthly partitions; site/PKI names become unique per tenant. This path is tested against a schema
+captured from the previous release. **Take a backup first** (below).
 
 ## Editions: one code base, two modes
 
@@ -89,25 +148,6 @@ trust anything issued for another. The permission matrix, cross-tenant access at
 are covered by automated tests (and I mutation-checked that the tests fail when the checks are removed).
 
 Tenant quotas (sites / APs / nodes, 0 = unlimited) are set per tenant.
-
-## Quick start (Docker Compose)
-
-```bash
-cp .env.example .env            # set RADMAN_DB_PASSWORD and BACKUP_PASSPHRASE
-docker compose up -d
-docker compose logs manager | grep "setup token"
-# open https://<host>/ -> create the first global administrator
-# Platform -> Tenants -> New tenant -> add its administrators -> Open the tenant and build sites
-```
-Ports: **443/tcp** (UI), 80/tcp (redirect), **7843/udp** (all site nodes). Everything else — the node download, enrollment, RadSEC
-generator, PKI, logs — works as before, now inside a tenant.
-
-### Upgrading from the single-tenant version
-Just start the new manager against the existing database. On first start it **migrates in place** (idempotent): existing data moves
-into a tenant called **Default**; old *admin* users become **global administrators**, *operators* become tenant administrators and
-*viewers* read-only members of Default; the old EAP/RadSec CAs become Default's CAs (already-issued certificates keep working);
-the events table is converted to monthly partitions; site/PKI names become unique per tenant. This path is tested against a schema
-captured from the previous release. **Take a backup first** (below).
 
 ## Single sign-on (SAML / Entra ID) — platform **and** per tenant
 
