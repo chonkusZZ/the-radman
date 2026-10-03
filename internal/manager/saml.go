@@ -10,17 +10,16 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
 
+	"radman/internal/netguard"
 	"radman/internal/pki"
 )
 
@@ -123,30 +122,7 @@ func (a *App) tenantProv(ctx context.Context, slug string) (*ssoProv, error) {
 // guardedClient is the HTTP client used to fetch IdP metadata. Tenant administrators supply URLs, so it must not
 // become a way to reach the platform's internal network: loopback, link-local and (for tenants) private ranges are refused.
 func guardedClient(allowPrivate bool) *http.Client {
-	d := &net.Dialer{Timeout: 10 * time.Second, Control: func(_, address string, _ syscall.RawConn) error {
-		host, _, _ := net.SplitHostPort(address)
-		return blockedAddr(net.ParseIP(host), allowPrivate)
-	}}
-	return &http.Client{Timeout: 15 * time.Second, Transport: &http.Transport{DialContext: d.DialContext}}
-}
-
-// blockedAddr decides whether an outbound connection to ip is refused.
-func blockedAddr(ip net.IP, allowPrivate bool) error {
-	if ip == nil {
-		return errors.New("refusing to connect")
-	}
-	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast() {
-		return errors.New("refusing to fetch from a loopback/link-local address")
-	}
-	if !allowPrivate {
-		if ip.IsPrivate() {
-			return errors.New("refusing to fetch from a private network address")
-		}
-		if v4 := ip.To4(); v4 != nil && v4[0] == 100 && v4[1]&0xc0 == 64 { // 100.64.0.0/10 carrier-grade NAT
-			return errors.New("refusing to fetch from a private network address")
-		}
-	}
-	return nil
+	return netguard.Client(allowPrivate)
 }
 
 // samlBase returns the SP half of the configuration (enough to publish metadata).

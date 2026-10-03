@@ -5,12 +5,18 @@ import (
 	"time"
 
 	"radman/internal/crl"
+	"radman/internal/netguard"
 )
+
+// crlClient fetches CRLs. Every URL comes from a tenant's own PKI profile (tenant-supplied, or lifted
+// from a certificate's CRL Distribution Points extension), so loopback/link-local/private destinations
+// are always refused — the same rule applied to tenant-supplied SAML metadata URLs.
+var crlClient = netguard.Client(false)
 
 // RefreshCRL downloads one CRL and stores it.
 func (a *App) RefreshCRL(ctx context.Context, url string) error {
 	now := time.Now()
-	der, rl, err := crl.Fetch(url)
+	der, rl, err := crl.Fetch(url, crlClient)
 	if err != nil {
 		a.St.DB.Exec(ctx, `INSERT INTO crl_cache(url,last_attempt,last_error) VALUES($1,$2,$3)
 			ON CONFLICT(url) DO UPDATE SET last_attempt=EXCLUDED.last_attempt, last_error=EXCLUDED.last_error`, url, now, err.Error())

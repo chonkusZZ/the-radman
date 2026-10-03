@@ -16,12 +16,14 @@ import (
 	"radman/internal/proto"
 )
 
-// Fetch downloads a CRL (DER or PEM) over http(s).
-func Fetch(url string) ([]byte, *x509.RevocationList, error) {
+// Fetch downloads a CRL (DER or PEM) over http(s) using c. The CRL URL comes from an administrator
+// (and, via a certificate's CRL Distribution Points extension, potentially from anyone who can get a
+// certificate accepted into a PKI profile), so c must be a guarded client — see netguard.Client — not
+// a bare http.Client, or this becomes a server-side request forgery vector.
+func Fetch(url string, c *http.Client) ([]byte, *x509.RevocationList, error) {
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 		return nil, nil, errors.New("only http(s) CRL URLs are supported")
 	}
-	c := &http.Client{Timeout: 30 * time.Second}
 	resp, err := c.Get(url)
 	if err != nil {
 		return nil, nil, err

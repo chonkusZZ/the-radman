@@ -20,11 +20,18 @@ import (
 	"github.com/quic-go/quic-go"
 
 	"radman/internal/crl"
+	"radman/internal/netguard"
 	"radman/internal/pki"
 	"radman/internal/proto"
 )
 
 var Version = "dev"
+
+// crlClient fetches CRLs. A node runs on the site's own network, where an on-prem CA's CRL distribution
+// point legitimately sits on a private address, so private ranges are allowed here (unlike the manager's
+// tenant-facing fetch) — but loopback and link-local addresses are still refused, so a CRL URL can never
+// be turned into a probe of the node's own local services.
+var crlClient = netguard.Client(true)
 
 const renewBefore = 30 * 24 * time.Hour
 
@@ -384,7 +391,7 @@ func (a *Agent) crlRefresher(ctx context.Context) {
 		}
 		for _, st := range srv.Runtime().PKIs {
 			for _, u := range st.NeedsRefresh() {
-				der, rl, err := crl.Fetch(u)
+				der, rl, err := crl.Fetch(u, crlClient)
 				if err != nil {
 					continue
 				}
